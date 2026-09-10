@@ -25,7 +25,7 @@ export default function TodoPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [title, setTitle] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
   const getTodayString = () => {
     const d = new Date();
     const year = d.getFullYear();
