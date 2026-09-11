@@ -6,7 +6,6 @@ import {
   Paperclip, 
   Upload, 
   FileText, 
-  Image as ImageIcon, 
   Trash2, 
   ExternalLink, 
   Sparkles,
@@ -17,7 +16,9 @@ import {
   Info,
   Copy,
   Check,
-  X
+  X,
+  Pencil,
+  Maximize2
 } from 'lucide-react';
 
 interface Trip {
@@ -52,8 +53,15 @@ export default function AttachmentsPage() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // 업로드용 폼 모달 상태
+  // 등록 및 수정 모달 상태
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<AttachmentItem | null>(null);
+
+  // 서류 미리보기 팝업 모달 상태
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Form 입력 상태
+  const [fileNameInput, setFileNameInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [category, setCategory] = useState('호텔 예약');
   const [bookingNo, setBookingNo] = useState('');
@@ -88,14 +96,38 @@ export default function AttachmentsPage() {
   };
 
   const fetchAttachments = async (tripId: string) => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('attachments')
       .select('*')
       .eq('trip_id', tripId)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setAttachments(data);
+    if (error || !data || data.length === 0) {
+      const backupResult = await supabase
+        .from('trip_attachments')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('created_at', { ascending: false });
+
+      if (!backupResult.error && backupResult.data) {
+        data = backupResult.data.map((item: any) => ({
+          id: item.id,
+          trip_id: item.trip_id,
+          file_name: item.file_name || item.title || '예약 서류',
+          file_path: item.file_path || '',
+          file_type: item.file_type || 'image/jpeg',
+          file_size: item.file_size || 0,
+          public_url: item.public_url || item.file_url || item.url || '',
+          category: item.category || '기타',
+          booking_no: item.booking_no || '',
+          memo: item.memo || '',
+          created_at: item.created_at,
+        }));
+      }
+    }
+
+    if (data) {
+      setAttachments(data as AttachmentItem[]);
     }
   };
 
@@ -109,63 +141,97 @@ export default function AttachmentsPage() {
     }
   }, [selectedTrip]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      setSelectedFile(files[0]);
-      setIsUploadModalOpen(true);
-    }
+  const handleOpenAddModal = () => {
+    setEditingItem(null);
+    setFileNameInput('');
+    setSelectedFile(null);
+    setCategory('호텔 예약');
+    setBookingNo('');
+    setMemo('');
+    setIsUploadModalOpen(true);
   };
 
-  const handleUploadSubmit = async (e: React.FormEvent) => {
+  const handleOpenEditModal = (item: AttachmentItem) => {
+    setEditingItem(item);
+    setFileNameInput(item.file_name);
+    setSelectedFile(null);
+    setCategory(item.category || '호텔 예약');
+    setBookingNo(item.booking_no || '');
+    setMemo(item.memo || '');
+    setIsUploadModalOpen(true);
+  };
+
+  const handleSaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile || !selectedTrip) return;
+    if (!selectedTrip) return;
 
     setIsUploading(true);
 
     try {
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-      const filePath = `${selectedTrip.id}/${fileName}`;
+      let filePath = editingItem?.file_path || '';
+      let publicUrl = editingItem?.public_url || '';
+      let fileType = editingItem?.file_type || 'text/plain';
+      let fileSize = editingItem?.file_size || 0;
+      let finalFileName = fileNameInput.trim() || selectedFile?.name || editingItem?.file_name || '예약 서류';
 
-      const { error: uploadError } = await supabase.storage
-        .from('trip-files')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const generatedFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+        filePath = `${selectedTrip.id}/${generatedFileName}`;
+        fileType = selectedFile.type;
+        fileSize = selectedFile.size;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('trip-files')
+          .upload(filePath, selectedFile, { cacheControl: '3600', upsert: true });
 
-      const { data: urlData } = supabase.storage
-        .from('trip-files')
-        .getPublicUrl(filePath);
+        if (uploadError) throw uploadError;
 
-      const publicUrl = urlData.publicUrl;
+        const { data: urlData } = supabase.storage
+          .from('trip-files')
+          .getPublicUrl(filePath);
 
-      const { error: dbError } = await supabase.from('attachments').insert([
-        {
-          trip_id: selectedTrip.id,
-          file_name: selectedFile.name,
-          file_path: filePath,
-          file_type: selectedFile.type,
-          file_size: selectedFile.size,
-          public_url: publicUrl,
-          category,
-          booking_no: bookingNo,
-          memo,
-        },
-      ]);
+        publicUrl = urlData.publicUrl;
+      }
 
-      if (dbError) throw dbError;
+      if (editingItem) {
+        const { error: dbError } = await supabase
+          .from('attachments')
+          .update({
+            file_name: finalFileName,
+            file_path: filePath,
+            file_type: fileType,
+            file_size: fileSize,
+            public_url: publicUrl,
+            category,
+            booking_no: bookingNo,
+            memo,
+          })
+          .eq('id', editingItem.id);
+
+        if (dbError) throw dbError;
+      } else {
+        const { error: dbError } = await supabase.from('attachments').insert([
+          {
+            trip_id: selectedTrip.id,
+            file_name: finalFileName,
+            file_path: filePath,
+            file_type: fileType,
+            file_size: fileSize,
+            public_url: publicUrl,
+            category,
+            booking_no: bookingNo,
+            memo,
+          },
+        ]);
+
+        if (dbError) throw dbError;
+      }
 
       setIsUploadModalOpen(false);
-      setSelectedFile(null);
-      setBookingNo('');
-      setMemo('');
       fetchAttachments(selectedTrip.id);
     } catch (err: any) {
-      alert('업로드 실패: ' + (err.message || '알 수 없는 오류'));
+      alert('저장 실패: ' + (err.message || '알 수 없는 오류'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -176,7 +242,9 @@ export default function AttachmentsPage() {
     if (!confirm(`'${item.file_name}' 문서를 삭제하시겠습니까?`)) return;
 
     try {
-      await supabase.storage.from('trip-files').remove([item.file_path]);
+      if (item.file_path) {
+        await supabase.storage.from('trip-files').remove([item.file_path]);
+      }
       const { error } = await supabase.from('attachments').delete().eq('id', item.id);
 
       if (!error && selectedTrip) {
@@ -193,14 +261,6 @@ export default function AttachmentsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
   return (
     <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
       {/* 1. 상단 타이틀 바 */}
@@ -210,25 +270,16 @@ export default function AttachmentsPage() {
             <Paperclip className="w-6 h-6 text-blue-600 shrink-0" />
             예약 & 티켓 서류 보관소
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">호텔 예약번호, QR 티켓, 바우처 정보를 안전하게 저장하고 일정과 연동하세요.</p>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">호텔 예약번호, QR 티켓, 바우처 정보를 안전하게 저장하고 관리하세요.</p>
         </div>
 
         {selectedTrip && (
-          <div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              className="hidden"
-              accept="image/*,.pdf"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer whitespace-nowrap shrink-0"
-            >
-              <Upload size={18} /> 새 서류 등록
-            </button>
-          </div>
+          <button
+            onClick={handleOpenAddModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <Upload size={18} /> 새 서류 등록
+          </button>
         )}
       </div>
 
@@ -299,9 +350,9 @@ export default function AttachmentsPage() {
                 </span>
               </div>
 
-              {/* 문서 추가 드래그 구역 */}
+              {/* 드래그/클릭 업로드 구역 */}
               <div 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handleOpenAddModal}
                 className="p-4 border-2 border-dashed border-blue-200 hover:border-blue-500 bg-blue-50/30 rounded-2xl text-center space-y-1 cursor-pointer transition shrink-0"
               >
                 <Upload className="w-5 h-5 text-blue-500 mx-auto" />
@@ -327,14 +378,28 @@ export default function AttachmentsPage() {
                           className="p-4 bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3 transition group"
                         >
                           <div className="space-y-2.5">
-                            {/* 상단 태그 & 삭제 버튼 */}
+                            {/* 상단 태그 및 수정/삭제 액션 */}
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
                                 <Icon size={12} /> {item.category || '기타'}
                               </span>
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                {formatFileSize(item.file_size)}
-                              </span>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleOpenEditModal(item)}
+                                  className="p-1 text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                                  title="서류 정보 수정"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFile(item)}
+                                  className="p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
+                                  title="삭제"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
 
                             {/* 파일명 & 메모 */}
@@ -365,24 +430,30 @@ export default function AttachmentsPage() {
                             )}
                           </div>
 
-                          {/* 하단 보기 및 삭제 액션 */}
-                          <div className="flex items-center justify-between border-t border-slate-100 pt-2.5">
-                            <a
-                              href={item.public_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition"
-                            >
-                              <ExternalLink size={14} /> 문서/티켓 열람하기
-                            </a>
-
-                            <button
-                              onClick={() => handleDeleteFile(item)}
-                              className="p-1 text-slate-300 hover:text-red-500 transition cursor-pointer"
-                              title="삭제"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                          {/* 🌟 팝업 열기 + 새 탭 원본 크게 보기(↗) 2개 버튼 세트 복원 */}
+                          <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between">
+                            {item.public_url ? (
+                              <>
+                                <button
+                                  onClick={() => setPreviewUrl(item.public_url)}
+                                  className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  <FileText size={14} /> 문서/티켓 열람하기
+                                </button>
+                                <a
+                                  href={item.public_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-0.5 transition cursor-pointer"
+                                  title="새 탭 창에서 파일 크게 열기"
+                                >
+                                  <span>원본보기</span>
+                                  <ExternalLink size={13} />
+                                </a>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-400">첨부 파일 없음 (메모)</span>
+                            )}
                           </div>
                         </div>
                       );
@@ -397,23 +468,47 @@ export default function AttachmentsPage() {
         </div>
       </div>
 
-      {/* 3. 파일 정보 입력 모달 */}
-      {isUploadModalOpen && selectedFile && (
+      {/* 3. 서류 등록 & 수정 모달 */}
+      {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="font-bold text-slate-900 text-base sm:text-lg flex items-center gap-1.5">
-                <Paperclip size={20} className="text-blue-600" /> 서류 상세 정보 입력
+                <Paperclip size={20} className="text-blue-600" />
+                {editingItem ? '예약 서류 정보 수정' : '새 예약 서류 등록'}
               </h2>
-              <button onClick={() => setIsUploadModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700">
+              <button onClick={() => setIsUploadModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleUploadSubmit} className="space-y-3.5">
-              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-0.5">
-                <p className="text-[11px] font-bold text-slate-400">선택된 파일</p>
-                <p className="text-xs font-bold text-slate-800 truncate">{selectedFile.name}</p>
+            <form onSubmit={handleSaveSubmit} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">서류 제목 / 이름</label>
+                <input
+                  type="text"
+                  placeholder="예: 피치항공 E-티켓, 피스 호스텔 바우처"
+                  value={fileNameInput}
+                  onChange={(e) => setFileNameInput(e.target.value)}
+                  className="w-full text-xs sm:text-sm font-bold text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">
+                  {editingItem ? '파일 변경 (선택)' : '티켓/QR/PDF 파일 첨부'}
+                </label>
+                <input
+                  type="file"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 p-2 rounded-xl outline-none"
+                  accept="image/*,.pdf"
+                />
+                {editingItem && !selectedFile && (
+                  <p className="text-[11px] text-blue-600 font-semibold mt-1">✓ 기존 파일이 등록되어 있습니다.</p>
+                )}
               </div>
 
               <div>
@@ -430,7 +525,7 @@ export default function AttachmentsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-400 mb-1 block">예약번호 / confirmation No. (선택)</label>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">예약번호 / Confirmation No. (선택)</label>
                 <input
                   type="text"
                   placeholder="예: BK-9281034"
@@ -455,7 +550,7 @@ export default function AttachmentsPage() {
                 <button
                   type="button"
                   onClick={() => setIsUploadModalOpen(false)}
-                  className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
                   취소
                 </button>
@@ -464,10 +559,44 @@ export default function AttachmentsPage() {
                   disabled={isUploading}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  {isUploading ? '저장 중...' : '서류 저장하기'}
+                  {isUploading ? '저장 중...' : editingItem ? '수정 완료' : '서류 저장하기'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. 1초 미리보기 팝업 모달 */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 shrink-0">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <FileText size={16} className="text-blue-600" /> 예약 서류 / 티켓 팝업
+              </h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 px-2 py-1 rounded-lg hover:bg-blue-50 transition"
+                  title="새 탭 창으로 더 크게 보기"
+                >
+                  <Maximize2 size={13} /> 크게 열기
+                </a>
+                <button onClick={() => setPreviewUrl(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-100/50">
+              {previewUrl.toLowerCase().includes('.pdf') ? (
+                <iframe src={previewUrl} className="w-full h-[60vh] rounded-xl" title="PDF 미리보기" />
+              ) : (
+                <img src={previewUrl} alt="서류/QR 미리보기" className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-xs" />
+              )}
+            </div>
           </div>
         </div>
       )}
