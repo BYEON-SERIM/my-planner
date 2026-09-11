@@ -13,6 +13,7 @@ import {
   Menu, 
   X,
   CheckSquare,
+  Wallet,
   PanelLeftClose,
   PanelLeft,
   LayoutDashboard
@@ -30,13 +31,14 @@ export default function Sidebar() {
         { name: '대시보드 홈', path: '/', icon: LayoutDashboard },
         { name: '캘린더', path: '/calendar', icon: Calendar },
         { name: 'To-Do 체크리스트', path: '/todo', icon: CheckSquare },
+        { name: '월간 가계부', path: '/account-book', icon: Wallet }, // 🌟 신규 일상 가계부 메뉴
       ],
     },
     {
       groupName: '여행 프로젝트',
       items: [
         { name: '여행 일정', path: '/trips', icon: Map },
-        { name: '여행 경비 관리', path: '/expenses', icon: Receipt },
+        { name: '여행 경비 관리', path: '/expenses', icon: Receipt }, // ✈️ 기존 여행 전용 경비
         { name: '예약 & 티켓', path: '/attachments', icon: Paperclip },
         { name: '여행 기록 다이어리', path: '/diaries', icon: BookOpen },
       ],
