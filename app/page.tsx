@@ -538,7 +538,7 @@ export default function DashboardPage() {
                         onClick={() => setPreviewUrl(doc.public_url)}
                         className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
                       >
-                        1초 열기
+                        미리보기
                       </button>
                     ) : (
                       <span className="text-[11px] text-slate-400 font-normal">파일 없음</span>
