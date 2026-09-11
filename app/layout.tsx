@@ -6,7 +6,7 @@ import Sidebar from './components/Sidebar';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'My TickTick Planner',
+  title: 'SECO LOG',
   description: '일정 및 여행 예산 관리 웹앱',
 };
 
