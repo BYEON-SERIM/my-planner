@@ -1,10 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Sidebar from './components/Sidebar';
 
 export const metadata: Metadata = {
   title: 'SECO LOG',
   description: '일정 및 여행 예산 관리 웹앱',
+};
+
+// 🌟 모바일/패드 포커스 시 화면 줌인 및 쏠림 방지
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -21,7 +29,8 @@ export default function RootLayout({
 
           {/* 메인 영역 */}
           <main className="flex-1 min-w-0 transition-all pt-14 lg:pt-0">
-            <div className="w-full max-w-5xl xl:max-w-7xl 2xl:max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8">
+            {/* 🌟 max-w-5xl 제거: 일반 PC/노트북 화면부터 기본 7xl(최대 1280px) 이상으로 시원하게 확장 */}
+            <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8">
               {children}
             </div>
           </main>

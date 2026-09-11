@@ -29,3 +29,16 @@ body {
   font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   min-height: 100vh;
 }
+
+/* 🌟 모바일 / 패드에서 텍스트박스 포커스 시 화면 자동 확대 및 위치 이동 방지 */
+@media screen and (max-width: 1024px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="password"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px !important; /* 16px 이상이어야 자동 줌인이 발동하지 않음 */
+  }
+}
