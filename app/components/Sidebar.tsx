@@ -71,7 +71,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-between px-1 py-1">
             <div className="flex items-center gap-2.5 overflow-hidden">
               <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-                <CheckCircle2 size={18} />
+                <Sparkles size={18} />
               </div>
               {!isCollapsed && (
                 <span className="font-black text-lg text-slate-800 tracking-tight whitespace-nowrap">
