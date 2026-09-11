@@ -42,7 +42,7 @@ export default function AccountBookPage() {
 
   // 모달 폼 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null); // 🌟 수정 중인 ID
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('식비');
@@ -94,7 +94,6 @@ export default function AccountBookPage() {
     setCurrentMonth(new Date(year, currentMonth.getMonth() + 1, 1));
   };
 
-  // 모달 초기화 및 열기 (신규 작성용)
   const openNewModal = () => {
     setEditingId(null);
     setType('expense');
@@ -106,7 +105,6 @@ export default function AccountBookPage() {
     setIsModalOpen(true);
   };
 
-  // 🌟 기존 내역 수정 모달 열기
   const openEditModal = (item: AccountItem) => {
     setEditingId(item.id);
     setType(item.type);
@@ -118,7 +116,6 @@ export default function AccountBookPage() {
     setIsModalOpen(true);
   };
 
-  // 🌟 저장 (신규 추가 & 기존 수정 공용)
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || isNaN(Number(amount))) return;
@@ -134,11 +131,9 @@ export default function AccountBookPage() {
 
     let error;
     if (editingId) {
-      // 수정 (Update)
       const res = await supabase.from('account_book').update(payload).eq('id', editingId);
       error = res.error;
     } else {
-      // 신규 추가 (Insert)
       const res = await supabase.from('account_book').insert([payload]);
       error = res.error;
     }
@@ -178,25 +173,25 @@ export default function AccountBookPage() {
   }));
 
   return (
-    <div className="space-y-6 w-full pb-8">
-      {/* 1. 상단 월 선택 & 요약 바 */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-blue-600" />
-            월간 가계부 & 자산 리포트
+    <div className="space-y-4 sm:space-y-6 w-full pb-8">
+      {/* 🌟 1. 상단 월 선택 & 요약 바: 모바일 대응 보정 */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
+            <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <span>월간 가계부 & 자산 리포트</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-0.5">
             한 달 수입과 지출 흐름을 그래프로 스마트하게 관리하세요.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto shrink-0">
           <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
             <button onClick={handlePrevMonth} className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer">
               <ChevronLeft size={16} />
             </button>
-            <span className="text-xs font-black text-slate-800 px-2">
+            <span className="text-xs font-black text-slate-800 px-1 sm:px-2 whitespace-nowrap">
               {year}년 {parseInt(month)}월
             </span>
             <button onClick={handleNextMonth} className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition cursor-pointer">
@@ -204,72 +199,74 @@ export default function AccountBookPage() {
             </button>
           </div>
 
+          {/* 🌟 눈에 부담스럽지 않은 연파랑 트렌디 버튼으로 교체 */}
           <button
             onClick={openNewModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1 shadow-xs cursor-pointer"
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap"
           >
-            <Plus size={16} /> 내역 추가
+            <Plus size={16} className="shrink-0" />
+            <span className="hidden sm:inline">내역 추가</span>
+            <span className="sm:hidden">추가</span>
           </button>
         </div>
       </div>
 
       {/* 2. 요약 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-bold">월 총 수입</span>
             <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <ArrowUpRight size={16} />
             </div>
           </div>
-          <p className="text-xl font-black text-slate-900">+ ₩{totalIncome.toLocaleString()}</p>
+          <p className="text-lg sm:text-xl font-black text-slate-900">+ ₩{totalIncome.toLocaleString()}</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-bold">월 총 지출</span>
             <div className="w-7 h-7 rounded-lg bg-rose-50 text-red-500 flex items-center justify-center">
               <ArrowDownLeft size={16} />
             </div>
           </div>
-          <p className="text-xl font-black text-slate-900">- ₩{totalExpense.toLocaleString()}</p>
+          <p className="text-lg sm:text-xl font-black text-slate-900">- ₩{totalExpense.toLocaleString()}</p>
         </div>
 
-        {/* 🌟 표준 용어: 이번 달 남은 돈 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-bold">이번 달 남은 돈</span>
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${totalBalance >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
               {totalBalance >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
             </div>
           </div>
-          <p className={`text-xl font-black ${totalBalance >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+          <p className={`text-lg sm:text-xl font-black ${totalBalance >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>
             {totalBalance >= 0 ? '+' : ''} ₩{totalBalance.toLocaleString()}
           </p>
         </div>
       </div>
 
       {/* 3. 차트 및 세부 내역 목록 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-5 bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-2.5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        <div className="lg:col-span-5 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+          <h2 className="text-xs sm:text-base font-bold text-slate-900 border-b border-slate-100 pb-2.5">
             📊 지출 카테고리 비중
           </h2>
 
           {pieChartData.length === 0 ? (
-            <div className="py-16 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+            <div className="py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
               지출 내역이 없습니다.
             </div>
           ) : (
-            <div className="h-[220px] w-full relative">
+            <div className="h-[200px] sm:h-[220px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieChartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
+                    innerRadius={50}
+                    outerRadius={75}
                     paddingAngle={3}
                     dataKey="value"
                   >
@@ -288,47 +285,46 @@ export default function AccountBookPage() {
           )}
         </div>
 
-        {/* 상세 내역 (수정 버튼 포함) */}
-        <div className="lg:col-span-7 bg-white p-5 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3 flex flex-col">
+        {/* 상세 내역 목록 */}
+        <div className="lg:col-span-7 bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3 flex flex-col">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <h2 className="text-base font-bold text-slate-900">
+            <h2 className="text-xs sm:text-base font-bold text-slate-900">
               📝 입출금 상세 내역 ({items.length}건)
             </h2>
           </div>
 
-          <div className="space-y-2 overflow-y-auto flex-1 max-h-[320px] pr-1">
+          <div className="space-y-2 overflow-y-auto flex-1 max-h-[300px] sm:max-h-[320px] pr-1">
             {loading ? (
-              <p className="text-xs text-slate-400 text-center py-12">불러오는 중...</p>
+              <p className="text-xs text-slate-400 text-center py-10">불러오는 중...</p>
             ) : items.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-12 border border-dashed border-slate-200 rounded-xl">
+              <p className="text-xs text-slate-400 text-center py-10 border border-dashed border-slate-200 rounded-xl">
                 등록된 입출금 내역이 없습니다.
               </p>
             ) : (
               items.map((item) => (
                 <div
                   key={item.id}
-                  className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between transition hover:border-slate-200"
+                  className="p-2.5 sm:p-3 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between transition hover:border-slate-200"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${item.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-red-600'}`}>
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-bold shrink-0 ${item.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-red-600'}`}>
                       {item.category.substring(0, 2)}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                         {item.description || item.category}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
                         {item.date} • {item.payment_method || '현금'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-xs font-extrabold mr-1 ${item.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <span className={`text-xs sm:text-sm font-extrabold mr-1 ${item.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                       {item.type === 'income' ? '+' : '-'} ₩{Number(item.amount).toLocaleString()}
                     </span>
 
-                    {/* 🌟 수정 버튼 */}
                     <button
                       onClick={() => openEditModal(item)}
                       className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
@@ -337,7 +333,6 @@ export default function AccountBookPage() {
                       <Pencil size={14} />
                     </button>
 
-                    {/* 삭제 버튼 */}
                     <button
                       onClick={() => handleDeleteItem(item.id)}
                       className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition cursor-pointer"
@@ -393,6 +388,7 @@ export default function AccountBookPage() {
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full text-sm font-bold text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
                   required
+                  autoFocus
                 />
               </div>
 
@@ -420,7 +416,8 @@ export default function AccountBookPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* 🌟 날짜와 결제수단 반응형 줄바꿈 처리 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1 block">날짜</label>
                   <input
@@ -445,7 +442,7 @@ export default function AccountBookPage() {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

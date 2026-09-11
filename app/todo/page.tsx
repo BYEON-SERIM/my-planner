@@ -149,27 +149,25 @@ export default function TodoPage() {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
-    <div className="space-y-6 w-full">
-      {/* 1. 주간 헤더 & 진행률 */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6 text-blue-600" />
+    <div className="space-y-4 sm:space-y-6 w-full pb-8">
+      {/* 🌟 1. 주간 헤더 & 진행률 보정 */}
+      <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <h1 className="text-sm sm:text-2xl font-black text-slate-800 truncate">
               주간 투두 체크리스트
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {weekDays[0].monthNum}월 {weekDays[0].dayNum}일 ~ {weekDays[6].monthNum}월 {weekDays[6].dayNum}일 주간 단위 관리
-            </p>
+            <div className="bg-blue-50 px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg border border-blue-100/80 flex items-center gap-1 shrink-0">
+              <span className="text-[11px] sm:text-xs font-bold text-blue-600">{progressPercent}%</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-50 px-3.5 py-1.5 rounded-xl border border-blue-100 flex items-center gap-2">
-              <span className="text-xs font-semibold text-blue-600">주간 달성률</span>
-              <span className="text-sm font-bold text-blue-700">{progressPercent}%</span>
-            </div>
-
-            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            <p className="sm:hidden text-[11px] text-slate-400 font-medium">
+              {weekDays[0].monthNum}.{weekDays[0].dayNum} ~ {weekDays[6].monthNum}.{weekDays[6].dayNum}
+            </p>
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 ml-auto sm:ml-0">
               <button onClick={handlePrevWeek} className="p-1 rounded-lg hover:bg-white text-slate-600 cursor-pointer">
                 <ChevronLeft size={16} />
               </button>
@@ -178,7 +176,7 @@ export default function TodoPage() {
                   setCurrentDate(new Date());
                   setSelectedDate(getTodayString());
                 }}
-                className="px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white transition rounded-lg cursor-pointer"
+                className="px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white transition rounded-lg cursor-pointer whitespace-nowrap"
               >
                 이번 주
               </button>
@@ -189,7 +187,7 @@ export default function TodoPage() {
           </div>
         </div>
 
-        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+        <div className="w-full bg-slate-100 h-2 sm:h-2.5 rounded-full overflow-hidden">
           <div 
             className="bg-blue-600 h-full transition-all duration-500 ease-out"
             style={{ width: `${progressPercent}%` }}
@@ -197,23 +195,23 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* 2. 주간 요일 캘린더 탭 */}
+      {/* 🌟 2. 주간 요일 캘린더 탭 (주간 전체보기 버튼 은은한 톤으로 교체) */}
       <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs">
         <div className="flex items-center justify-between mb-2 px-1">
           <button
             onClick={() => setFilterMode('all_week')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
+            className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer ${
               filterMode === 'all_week'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-500 hover:bg-slate-50'
+                ? 'bg-blue-50 text-blue-600 border border-blue-200/60 font-extrabold'
+                : 'text-slate-500 hover:bg-slate-50 border border-transparent'
             }`}
           >
-            📅 주간 전체 모아보기 ({thisWeekSchedules.length})
+            📅 주간 전체 보기 ({thisWeekSchedules.length})
           </button>
-          <span className="text-[11px] text-slate-400">날짜를 클릭하면 해당 일만 필터링됩니다.</span>
+          <span className="hidden sm:inline text-[11px] text-slate-400">날짜를 클릭하면 해당 일만 필터링됩니다.</span>
         </div>
 
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
           {weekDays.map((w) => {
             const daySchedules = thisWeekSchedules.filter((s) => s.date === w.dateStr);
             const isSelected = filterMode === 'day' && selectedDate === w.dateStr;
@@ -225,7 +223,7 @@ export default function TodoPage() {
                   setSelectedDate(w.dateStr);
                   setFilterMode('day');
                 }}
-                className={`p-2 rounded-xl flex flex-col items-center transition cursor-pointer ${
+                className={`p-1.5 sm:p-2 rounded-xl flex flex-col items-center transition cursor-pointer ${
                   isSelected
                     ? 'bg-blue-50 border-2 border-blue-500 font-bold text-blue-600 shadow-2xs'
                     : w.isToday
@@ -236,9 +234,9 @@ export default function TodoPage() {
                 <span className={`text-[10px] ${w.dayName === '일' ? 'text-red-500' : w.dayName === '토' ? 'text-blue-500' : 'text-slate-400'}`}>
                   {w.dayName}
                 </span>
-                <span className="text-sm font-extrabold my-0.5">{w.dayNum}</span>
+                <span className="text-xs sm:text-sm font-extrabold my-0.5">{w.dayNum}</span>
                 {daySchedules.length > 0 && (
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 font-bold">
+                  <span className="text-[9px] px-1 sm:px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 font-bold">
                     {daySchedules.length}
                   </span>
                 )}
@@ -247,24 +245,26 @@ export default function TodoPage() {
           })}
         </div>
       </div>
-
+      
       {/* 3. 할 일 입력 폼 */}
-      <form onSubmit={handleAddSchedule} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-          <Plus className="text-slate-400 w-5 h-5" />
+      <form onSubmit={handleAddSchedule} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+        {/* 텍스트 입력부 */}
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+          <Plus className="text-slate-400 w-5 h-5 shrink-0" />
           <input
             type="text"
             placeholder="할 일을 입력하세요..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
+            className="w-full text-xs sm:text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs text-slate-700">
-              <Calendar size={14} className="text-slate-400" />
+        {/* 옵션 선택 & 추가 버튼 라인 */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+            {/* 🌟 날짜 선택 (브라우저 기본 아이콘과 중복 제거 및 깔끔한 폰트 크기) */}
+            <div className="flex items-center bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-xs text-slate-700 hover:bg-slate-100 transition">
               <input
                 type="date"
                 value={selectedDate}
@@ -272,16 +272,17 @@ export default function TodoPage() {
                   setSelectedDate(e.target.value);
                   setFilterMode('day');
                 }}
-                className="bg-transparent outline-none cursor-pointer font-medium"
+                className="bg-transparent outline-none cursor-pointer font-bold text-xs text-slate-700 p-0 border-none appearance-none"
               />
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs text-slate-700">
-              <Tag size={14} className="text-slate-400" />
+            {/* 🌟 카테고리 선택 */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-xs text-slate-700 hover:bg-slate-100 transition">
+              <Tag size={13} className="text-slate-400 shrink-0" />
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="bg-transparent outline-none cursor-pointer font-medium"
+                className="bg-transparent outline-none cursor-pointer font-bold text-xs text-slate-700 border-none p-0"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -290,9 +291,10 @@ export default function TodoPage() {
             </div>
           </div>
 
+          {/* 🌟 추가하기 버튼 (우측 수평 정렬) */}
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-xl transition active:scale-95 shadow-sm shadow-blue-500/20 ml-auto cursor-pointer"
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
           >
             추가하기
           </button>
@@ -301,32 +303,32 @@ export default function TodoPage() {
 
       {/* 4. 할 일 리스트 */}
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">목록을 불러오는 중...</div>
+        <div className="text-center py-12 text-slate-400 text-xs sm:text-sm">목록을 불러오는 중...</div>
       ) : displaySchedules.length === 0 ? (
-        <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl">
-          <p className="text-slate-400 text-sm font-medium">선택된 기간에 등록된 할 일이 없습니다.</p>
+        <div className="text-center py-12 sm:py-16 bg-white border border-dashed border-slate-200 rounded-2xl">
+          <p className="text-slate-400 text-xs sm:text-sm font-medium">선택된 기간에 등록된 할 일이 없습니다.</p>
         </div>
       ) : (
         <ul className="space-y-2">
           {displaySchedules.map((item) => (
             <li
               key={item.id}
-              className="group flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-xs transition"
+              className="group flex items-center justify-between p-3 sm:p-3.5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-xs transition gap-2"
             >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                 <button
                   onClick={() => toggleComplete(item.id, item.is_completed)}
-                  className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer ${
+                  className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
                     item.is_completed
                       ? 'bg-blue-600 border-blue-600 text-white'
                       : 'border-slate-300 hover:border-blue-500 bg-white'
                   }`}
                 >
-                  {item.is_completed && <Check size={14} strokeWidth={3} />}
+                  {item.is_completed && <Check size={13} strokeWidth={3} />}
                 </button>
 
                 <span
-                  className={`text-sm font-medium truncate ${
+                  className={`text-xs sm:text-sm font-medium truncate ${
                     item.is_completed ? 'line-through text-slate-400' : 'text-slate-900'
                   }`}
                 >
@@ -334,21 +336,22 @@ export default function TodoPage() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 ml-3 shrink-0">
-                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                <span className="text-[10px] sm:text-[11px] px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
                   {item.category}
                 </span>
 
-                <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 font-medium">
+                <span className="text-[10px] sm:text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 sm:px-2 rounded-md border border-slate-100 font-medium">
                   {item.date}
                 </span>
 
+                {/* 🌟 모바일 대응: 터치 화면에서는 삭제 아이콘이 항상 보이도록 투명도 조정 */}
                 <button
                   onClick={() => handleDelete(item.id)}
-                  className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100 cursor-pointer"
+                  className="p-1 sm:p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
                   aria-label="삭제"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={15} />
                 </button>
               </div>
             </li>

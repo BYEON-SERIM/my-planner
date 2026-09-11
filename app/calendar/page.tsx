@@ -81,7 +81,6 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // 🌟 시작일 변경 핸들러 (시작일이 종료일보다 뒤로 설정되면 종료일을 시작일로 변경)
   const handleStartDateChange = (val: string) => {
     setStartDate(val);
     if (endDate < val) {
@@ -89,7 +88,6 @@ export default function CalendarPage() {
     }
   };
 
-  // 🌟 종료일 변경 핸들러 (종료일이 시작일보다 앞으로 변경되면 시작일을 종료일로 변경)
   const handleEndDateChange = (val: string) => {
     setEndDate(val);
     if (val < startDate) {
@@ -283,21 +281,24 @@ export default function CalendarPage() {
   return (
     <div className="space-y-4 w-full flex flex-col min-h-[calc(100vh-120px)] sm:h-[calc(100vh-90px)]">
       {/* 1. 상단 컨트롤 영역 */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+          <h1 className="text-lg sm:text-2xl font-extrabold text-slate-800 flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
             {year}년 {month + 1}월
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">날짜의 + 버튼으로 일정을 추가하고, 일정을 클릭하면 수정/삭제할 수 있습니다.</p>
+          <p className="hidden sm:block text-xs text-slate-500 mt-0.5">날짜의 + 버튼으로 일정을 추가하고, 일정을 클릭하면 수정/삭제할 수 있습니다.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* 🌟 소프트 블루 스타일로 개선된 일정 추가 버튼 */}
           <button
             onClick={() => handleOpenAddModal(getTodayString())}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Plus size={15} /> 일정 추가
+            <Plus size={15} className="shrink-0" />
+            <span className="hidden sm:inline">일정 추가</span>
+            <span className="sm:hidden">추가</span>
           </button>
 
           <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
@@ -517,7 +518,6 @@ export default function CalendarPage() {
                 />
               </div>
 
-              {/* 🌟 모바일 반응형: grid-cols-1 sm:grid-cols-2 로 모바일 줄바꿈 처리 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 block">시작일</label>
@@ -539,7 +539,6 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* 카테고리 드롭다운 */}
               <div className="space-y-1.5">
                 <label className="text-[10px] sm:text-xs text-slate-400 font-bold block">카테고리 & 라벨 컬러</label>
                 <div className="flex items-center justify-between gap-2">
@@ -653,7 +652,6 @@ export default function CalendarPage() {
                 />
               </div>
 
-              {/* 🌟 수정 모달에도 동일하게 모바일 반응형 grid-cols-1 sm:grid-cols-2 적용 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-[10px] sm:text-xs text-slate-400 font-bold mb-1 block">시작일</label>

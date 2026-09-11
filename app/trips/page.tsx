@@ -92,7 +92,7 @@ export default function TripsPage() {
 
   // 타임라인 일정 추가 / 수정 모달 상태
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<TripPlan | null>(null); // null이면 등록 모드, 존재하면 수정 모드
+  const [editingPlan, setEditingPlan] = useState<TripPlan | null>(null);
   const [selectedDayNum, setSelectedScheduleDayNum] = useState<number>(1);
   const [planTime, setPlanTime] = useState('09:00');
   const [planContent, setPlanContent] = useState('');
@@ -266,7 +266,6 @@ export default function TripsPage() {
     setEditingTrip(null);
   };
 
-  // 일정 등록 모달 열기
   const handleOpenAddPlanModal = (dayNum: number) => {
     setEditingPlan(null);
     setSelectedScheduleDayNum(dayNum);
@@ -277,7 +276,6 @@ export default function TripsPage() {
     setIsPlanModalOpen(true);
   };
 
-  // 일정 수정 모달 열기 👈 추가됨!
   const handleOpenEditPlanModal = (plan: TripPlan) => {
     setEditingPlan(plan);
     setSelectedScheduleDayNum(plan.day_num);
@@ -288,13 +286,11 @@ export default function TripsPage() {
     setIsPlanModalOpen(true);
   };
 
-  // 일정 저장 (등록 또는 수정) 👈 고도화!
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTrip || !planContent.trim()) return;
 
     if (editingPlan) {
-      // 기존 일정 수정
       const { error } = await supabase
         .from('trip_plans')
         .update({
@@ -310,7 +306,6 @@ export default function TripsPage() {
         fetchTripDetails(selectedTrip.id);
       }
     } else {
-      // 신규 일정 추가
       const { error } = await supabase.from('trip_plans').insert([
         {
           trip_id: selectedTrip.id,
@@ -414,44 +409,49 @@ export default function TripsPage() {
 
   return (
     <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="flex items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+      <div className="flex items-center justify-between gap-2.5 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
             <Map className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            여행 프로젝트 관리
+            <span>여행 프로젝트 관리</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">일정 선택 시 연동된 티켓과 바우처를 바로 열람하고 수정을 완료하세요.</p>
+          <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-0.5">
+            일정 선택 시 연동된 티켓과 바우처를 바로 열람하고 수정을 완료하세요.
+          </p>
         </div>
 
+        {/* 🌟 소프트 블루 디자인 버튼 적용 */}
         <button
           onClick={() => {
             resetForm();
             setIsAddTripModalOpen(true);
           }}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+          className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
         >
-          <Plus size={16} /> 새 여행 등록
+          <Plus size={16} className="shrink-0" />
+          <span className="hidden sm:inline">새 여행 등록</span>
+          <span className="sm:hidden">등록</span>
         </button>
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
         {/* 좌측 여행 리스트 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col min-h-[200px] max-h-[300px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 shrink-0">
-            <h2 className="text-sm font-bold text-slate-800">내 여행 리스트</h2>
-            <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[180px] max-h-[250px] lg:max-h-none lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
+            <h2 className="text-xs sm:text-base font-bold text-slate-800">내 여행 리스트</h2>
+            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
               총 {trips.length}개
             </span>
           </div>
 
-          <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
             {loading ? (
-              <p className="text-xs sm:text-sm text-slate-400 py-8 text-center">불러오는 중...</p>
+              <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
-              <div className="text-center py-12 space-y-2">
-                <Sparkles className="w-6 h-6 text-blue-400 mx-auto opacity-50" />
+              <div className="text-center py-8 space-y-1.5">
+                <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-50" />
                 <p className="text-xs sm:text-sm text-slate-400 font-medium">등록된 여행이 없습니다.</p>
               </div>
             ) : (
@@ -465,7 +465,7 @@ export default function TripsPage() {
                   <div
                     key={trip.id}
                     onClick={() => setSelectedTrip(trip)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2.5 ${
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2 ${
                       isSelected
                         ? 'bg-slate-50/50 shadow-2xs'
                         : 'bg-white border-slate-100 hover:border-slate-300'
@@ -490,11 +490,11 @@ export default function TripsPage() {
                         </span>
                         <span className="text-[11px] font-bold text-slate-400">{durationText}</span>
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900 truncate">{trip.title}</h3>
-                      <p className="text-xs text-slate-500 font-medium">📍 {trip.destination}</p>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{trip.title}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium">📍 {trip.destination}</p>
                     </div>
 
-                    <div className="pl-1.5 flex items-center justify-between border-t border-slate-100/80 pt-2 text-[11px] text-slate-400">
+                    <div className="pl-1.5 flex items-center justify-between border-t border-slate-100/80 pt-2 text-[10px] sm:text-[11px] text-slate-400">
                       <span className="flex items-center gap-1">
                         <Calendar size={12} /> {trip.start_date} ~ {trip.end_date}
                       </span>
@@ -524,23 +524,23 @@ export default function TripsPage() {
         </div>
 
         {/* 우측 상세 화면 */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col min-h-[450px] lg:min-h-0">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-5 flex flex-col min-h-[400px] lg:min-h-0">
           {selectedTrip ? (
-            <div className="flex flex-col h-full space-y-4">
+            <div className="flex flex-col h-full space-y-3.5">
               {/* 상단 탭 헤더 */}
-              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-100 pb-3 shrink-0">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-100 pb-2.5 shrink-0">
                 <div>
                   <div className="flex items-center gap-2">
                     <div 
-                      className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs" 
+                      className="w-3 h-3 rounded-full shrink-0 shadow-xs" 
                       style={{ backgroundColor: selectedTrip.color || '#3b82f6' }}
                     />
-                    <h2 className="text-base sm:text-lg font-bold text-slate-900">{selectedTrip.title}</h2>
-                    <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600">
+                    <h2 className="text-xs sm:text-lg font-bold text-slate-900 truncate">{selectedTrip.title}</h2>
+                    <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 shrink-0">
                       {calculateNights(selectedTrip.start_date, selectedTrip.end_date)}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">📍 {selectedTrip.destination} | {selectedTrip.start_date} ~ {selectedTrip.end_date}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">📍 {selectedTrip.destination} | {selectedTrip.start_date} ~ {selectedTrip.end_date}</p>
                 </div>
 
                 <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 w-full xl:w-auto">
@@ -631,7 +631,7 @@ export default function TripsPage() {
                       return (
                         <div 
                           key={d.dateStr} 
-                          className="w-full shrink-0 snap-center p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col space-y-3 min-h-0"
+                          className="w-full shrink-0 snap-center p-3.5 sm:p-4 bg-slate-50/70 border border-slate-200/80 rounded-2xl flex flex-col space-y-3 min-h-0"
                         >
                           <div className="flex items-center justify-between border-b border-slate-200 pb-2.5 shrink-0">
                             <div className="flex items-center gap-2">
@@ -652,9 +652,9 @@ export default function TripsPage() {
                             </button>
                           </div>
 
-                          <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                          <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0">
                             {dayPlans.length === 0 ? (
-                              <div className="py-16 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
+                              <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
                                 <p className="text-xs font-semibold text-slate-500">등록된 일정이 없습니다.</p>
                                 <p className="text-[11px] text-slate-400">[+ 일정 추가]를 눌러 코스를 추가해보세요.</p>
                               </div>
@@ -693,7 +693,6 @@ export default function TripsPage() {
                                     )}
                                   </div>
 
-                                  {/* 일정 카드 수정 및 삭제 버튼 👈 추가 완료! */}
                                   <div className="flex items-center gap-1 shrink-0">
                                     <button
                                       onClick={() => handleOpenEditPlanModal(plan)}
@@ -734,7 +733,7 @@ export default function TripsPage() {
                     />
                     <button
                       type="submit"
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition cursor-pointer shrink-0"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs font-bold px-3.5 py-2.5 rounded-xl transition cursor-pointer shrink-0"
                     >
                       추가
                     </button>
@@ -742,7 +741,7 @@ export default function TripsPage() {
 
                   <div className="space-y-2 overflow-y-auto flex-1 pr-1">
                     {(activeTab === 'packing' ? packingItems : shoppingItems).length === 0 ? (
-                      <p className="text-xs text-slate-400 py-12 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                      <p className="text-xs text-slate-400 py-10 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
                         {activeTab === 'packing' ? '등록된 준비물이 없습니다.' : '등록된 쇼핑 리스트가 없습니다.'}
                       </p>
                     ) : (
@@ -825,7 +824,8 @@ export default function TripsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* 🌟 모바일 반응형 grid-cols-1 sm:grid-cols-2 줄바꿈 적용 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1 block">시작일</label>
                   <input
@@ -878,7 +878,7 @@ export default function TripsPage() {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsAddTripModalOpen(false)}
@@ -888,7 +888,7 @@ export default function TripsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm cursor-pointer"
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition"
                 >
                   등록하기
                 </button>
@@ -934,7 +934,7 @@ export default function TripsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1 block">시작일</label>
                   <input
@@ -987,7 +987,7 @@ export default function TripsPage() {
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsEditTripModalOpen(false)}
@@ -997,7 +997,7 @@ export default function TripsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm cursor-pointer"
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition"
                 >
                   저장하기
                 </button>
@@ -1007,7 +1007,7 @@ export default function TripsPage() {
         </div>
       )}
 
-      {/* 5. 일자별 타임라인 일정 추가 / 수정 통합 모달 👈 수정 기능 보정! */}
+      {/* 5. 일자별 타임라인 일정 추가 / 수정 통합 모달 */}
       {isPlanModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
@@ -1073,7 +1073,7 @@ export default function TripsPage() {
                 </select>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsPlanModalOpen(false)}
@@ -1083,7 +1083,7 @@ export default function TripsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm cursor-pointer"
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition"
                 >
                   {editingPlan ? '수정 완료' : '등록하기'}
                 </button>

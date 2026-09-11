@@ -47,7 +47,7 @@ export default function DiariesPage() {
   // Day 필터 상태 (0 = 전체 보기, 1 = Day 1, 2 = Day 2 ...)
   const [selectedDayFilter, setSelectedDayFilter] = useState<number>(0);
 
-  // 펼쳐진 Day 카드의 ID 목록 (토글 상태 관리)
+  // 펼쳐진 Day 카드의 ID 목록
   const [expandedDiaryIds, setExpandedDiaryIds] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -271,7 +271,6 @@ export default function DiariesPage() {
     ? Array.from({ length: totalDays }).map((_, i) => i + 1)
     : [selectedDayFilter];
 
-  // 🌟 선택된 Day의 실제 날짜 계산 함수
   const getTargetDayDate = (startDateStr: string, dayIndex: number) => {
     if (!startDateStr) return '';
     const date = new Date(startDateStr);
@@ -288,33 +287,35 @@ export default function DiariesPage() {
 
   return (
     <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="flex items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-blue-600 shrink-0" />
-            여행 포토 에세이 & 블로그
+      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+      <div className="flex items-center justify-between gap-2.5 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <span>여행 포토 에세이 & 블로그</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">상단 Day 탭을 눌러 원하는 날짜의 일기를 펼쳐서 확인해 보세요.</p>
+          <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-1">
+            상단 Day 탭을 눌러 원하는 날짜의 일기를 펼쳐서 확인해 보세요.
+          </p>
         </div>
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
         {/* 좌측 여행 선택 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col min-h-[180px] max-h-[250px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 shrink-0">
-            <h2 className="text-sm sm:text-base font-bold text-slate-800">여행 선택</h2>
-            <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[160px] max-h-[220px] lg:max-h-none lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
+            <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
+            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
               총 {trips.length}개
             </span>
           </div>
 
-          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-2 overflow-y-auto flex-1 pr-1">
             {loading ? (
-              <p className="text-xs sm:text-sm text-slate-400 py-8 text-center">불러오는 중...</p>
+              <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
-              <div className="text-center py-8 space-y-1">
+              <div className="text-center py-6 space-y-1">
                 <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-50" />
                 <p className="text-xs sm:text-sm text-slate-400">등록된 여행이 없습니다.</p>
               </div>
@@ -327,7 +328,7 @@ export default function DiariesPage() {
                   <div
                     key={trip.id}
                     onClick={() => setSelectedTrip(trip)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
+                    className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
                         ? 'bg-slate-50/50 shadow-2xs font-bold'
                         : 'bg-white border-slate-100 hover:border-slate-300'
@@ -342,8 +343,8 @@ export default function DiariesPage() {
                       style={{ backgroundColor: tripColor }}
                     />
                     <div className="pl-1.5 min-w-0 flex-1">
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">{trip.title}</h3>
-                      <p className="text-xs text-slate-400 truncate mt-0.5">📍 {trip.destination}</p>
+                      <h3 className="text-xs sm:text-base font-bold text-slate-900 truncate">{trip.title}</h3>
+                      <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-0.5">📍 {trip.destination}</p>
                     </div>
                   </div>
                 );
@@ -353,15 +354,15 @@ export default function DiariesPage() {
         </div>
 
         {/* 우측 포토 블로그 화면 */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col min-h-[450px] lg:min-h-0">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-5 flex flex-col min-h-[400px] lg:min-h-0">
           {selectedTrip ? (
-            <div className="flex flex-col h-full space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <Heart className="text-pink-500 fill-pink-500" size={18} />
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">{selectedTrip.title} 포토 다이어리</h2>
+            <div className="flex flex-col h-full space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 shrink-0 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <Heart className="text-pink-500 fill-pink-500 shrink-0" size={18} />
+                  <h2 className="text-xs sm:text-lg font-bold text-slate-900 truncate">{selectedTrip.title} 포토 다이어리</h2>
                 </div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
+                <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
                   기록 {diaries.length} / {totalDays}일 완료
                 </span>
               </div>
@@ -413,7 +414,7 @@ export default function DiariesPage() {
               </div>
 
               {/* Day별 포토 포스팅 리스트 */}
-              <div className="space-y-4 overflow-y-auto flex-1 pr-1 min-h-0">
+              <div className="space-y-3.5 overflow-y-auto flex-1 pr-1 min-h-0">
                 {displayedDays.map((dayNum) => {
                   const diary = diaries.find((d) => d.day_num === dayNum);
                   const isExpanded = diary ? expandedDiaryIds.includes(diary.id) : true;
@@ -422,30 +423,29 @@ export default function DiariesPage() {
                   return (
                     <div 
                       key={dayNum}
-                      className="p-4 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 transition hover:border-slate-300"
+                      className="p-3.5 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 transition hover:border-slate-300"
                     >
                       <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
                         <div className="flex items-center gap-2 min-w-0">
                           <span 
-                            className="text-xs font-black text-white px-2.5 py-0.5 rounded-md shadow-2xs shrink-0"
+                            className="text-xs font-black text-white px-2 py-0.5 rounded-md shadow-2xs shrink-0"
                             style={{ backgroundColor: selectedTrip.color || '#3b82f6' }}
                           >
                             Day {dayNum}
                           </span>
                           
-                          {/* 🌟 헤더 부분 날짜 & 제목 표시 보정 */}
-                          <h3 className="text-sm sm:text-base font-extrabold text-slate-900 truncate flex items-center gap-1.5">
+                          <h3 className="text-xs sm:text-base font-extrabold text-slate-900 truncate flex items-center gap-1.5">
                             {diary?.title ? (
                               diary.title
                             ) : (
-                              <span className="text-slate-500 font-semibold flex items-center gap-1">
-                                <Calendar size={14} className="text-slate-400" /> {targetDateText}
+                              <span className="text-slate-500 font-semibold flex items-center gap-1 text-xs sm:text-sm">
+                                <Calendar size={13} className="text-slate-400" /> {targetDateText}
                               </span>
                             )}
                           </h3>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {diary && (
                             <div className="hidden sm:flex items-center text-amber-400">
                               {Array.from({ length: diary.rating }).map((_, i) => (
@@ -490,9 +490,8 @@ export default function DiariesPage() {
                       {diary ? (
                         isExpanded ? (
                           <div className="space-y-3 pt-1">
-                            {/* 🌟 작성된 일기 상단에도 해당 날짜 표시 */}
-                            <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                              <Calendar size={13} /> {targetDateText}
+                            <p className="text-[11px] sm:text-xs font-bold text-slate-400 flex items-center gap-1">
+                              <Calendar size={12} /> {targetDateText}
                             </p>
 
                             {/* 갤러리 이미지 */}
@@ -512,7 +511,7 @@ export default function DiariesPage() {
                             )}
 
                             {/* 긴 글 본문 */}
-                            <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                            <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
                               <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
                                 {diary.content || '작성된 본문 글이 없습니다.'}
                               </p>
@@ -528,12 +527,11 @@ export default function DiariesPage() {
                           </div>
                         )
                       ) : (
-                        /* 🌟 일기가 비어있을 때 깔끔한 날짜 기반 가이드 표시 */
                         <div 
                           onClick={() => handleOpenModalForDay(dayNum)}
-                          className="py-8 text-center border border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-white transition space-y-1"
+                          className="py-6 sm:py-8 text-center border border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-white transition space-y-1"
                         >
-                          <ImageIcon className="w-6 h-6 text-slate-300 mx-auto" />
+                          <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-300 mx-auto" />
                           <p className="text-xs font-bold text-slate-700">
                             Day {dayNum} · {targetDateText}
                           </p>
@@ -670,12 +668,14 @@ export default function DiariesPage() {
                 >
                   취소
                 </button>
+                
+                {/* 🌟 소프트 파랑 스티일 버튼 적용 */}
                 <button
                   type="submit"
                   disabled={isUploading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-sm cursor-pointer disabled:opacity-50"
+                  className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-50 transition"
                 >
-                  {isUploading ? '업로드 및 저장 중...' : '블로그 포스팅 저장'}
+                  {isUploading ? '업로드 및 저장 중...' : '포스팅 저장'}
                 </button>
               </div>
             </form>

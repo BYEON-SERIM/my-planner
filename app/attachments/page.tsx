@@ -18,7 +18,8 @@ import {
   Check,
   X,
   Pencil,
-  Maximize2
+  Maximize2,
+  Plus
 } from 'lucide-react';
 
 interface Trip {
@@ -263,42 +264,46 @@ export default function AttachmentsPage() {
 
   return (
     <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
-      {/* 1. 상단 타이틀 바 */}
-      <div className="flex items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-            <Paperclip className="w-6 h-6 text-blue-600 shrink-0" />
-            예약 & 티켓 서류 보관소
+      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+      <div className="flex items-center justify-between gap-2.5 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
+            <Paperclip className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
+            <span>예약 & 티켓 서류 보관소</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">호텔 예약번호, QR 티켓, 바우처 정보를 안전하게 저장하고 관리하세요.</p>
+          <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-1">
+            호텔 예약번호, QR 티켓, 바우처 정보를 안전하게 저장하고 관리하세요.
+          </p>
         </div>
 
         {selectedTrip && (
-          <button
+            <button
             onClick={handleOpenAddModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <Upload size={18} /> 새 서류 등록
-          </button>
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+        >
+            <Upload size={16} className="shrink-0" />
+            <span className="hidden sm:inline">새 서류 등록</span>
+            <span className="sm:hidden">등록</span>
+        </button>
         )}
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
         {/* 좌측 여행 선택 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 flex flex-col min-h-[180px] max-h-[250px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3 shrink-0">
-            <h2 className="text-sm sm:text-base font-bold text-slate-800">여행 선택</h2>
-            <span className="text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[160px] max-h-[220px] lg:max-h-none lg:min-h-0">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
+            <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
+            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
               총 {trips.length}개
             </span>
           </div>
 
-          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-2 overflow-y-auto flex-1 pr-1">
             {loading ? (
-              <p className="text-xs sm:text-sm text-slate-400 py-8 text-center">불러오는 중...</p>
+              <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
-              <div className="text-center py-8 space-y-1">
+              <div className="text-center py-6 space-y-1">
                 <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-50" />
                 <p className="text-xs sm:text-sm text-slate-400">등록된 여행이 없습니다.</p>
               </div>
@@ -311,7 +316,7 @@ export default function AttachmentsPage() {
                   <div
                     key={trip.id}
                     onClick={() => setSelectedTrip(trip)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
+                    className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
                         ? 'bg-slate-50/50 shadow-2xs font-bold'
                         : 'bg-white border-slate-100 hover:border-slate-300'
@@ -326,8 +331,8 @@ export default function AttachmentsPage() {
                       style={{ backgroundColor: tripColor }}
                     />
                     <div className="pl-1.5 min-w-0 flex-1">
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">{trip.title}</h3>
-                      <p className="text-xs text-slate-400 truncate mt-0.5">📍 {trip.destination}</p>
+                      <h3 className="text-xs sm:text-base font-bold text-slate-900 truncate">{trip.title}</h3>
+                      <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-0.5">📍 {trip.destination}</p>
                     </div>
                   </div>
                 );
@@ -337,15 +342,18 @@ export default function AttachmentsPage() {
         </div>
 
         {/* 우측 서류 상세 카드 리스트 */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col min-h-[450px] lg:min-h-0">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-5 flex flex-col min-h-[400px] lg:min-h-0">
           {selectedTrip ? (
-            <div className="flex flex-col h-full space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <FileCheck className="text-blue-600" size={20} />
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">{selectedTrip.title} 서류 목록</h2>
+            <div className="flex flex-col h-full space-y-3.5">
+              {/* 🌟 서류 목록 헤더 보정 */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 shrink-0 gap-2">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <FileCheck className="text-blue-600 shrink-0" size={18} />
+                  <h2 className="text-xs sm:text-lg font-bold text-slate-900 truncate">
+                    {selectedTrip.title} 서류 목록
+                  </h2>
                 </div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
+                <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-slate-100 text-slate-600 shrink-0 whitespace-nowrap">
                   총 {attachments.length}개 파일
                 </span>
               </div>
@@ -353,34 +361,34 @@ export default function AttachmentsPage() {
               {/* 드래그/클릭 업로드 구역 */}
               <div 
                 onClick={handleOpenAddModal}
-                className="p-4 border-2 border-dashed border-blue-200 hover:border-blue-500 bg-blue-50/30 rounded-2xl text-center space-y-1 cursor-pointer transition shrink-0"
+                className="p-3.5 sm:p-4 border-2 border-dashed border-blue-200 hover:border-blue-500 bg-blue-50/30 rounded-2xl text-center space-y-1 cursor-pointer transition shrink-0"
               >
-                <Upload className="w-5 h-5 text-blue-500 mx-auto" />
+                <Upload className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 mx-auto" />
                 <p className="text-xs sm:text-sm font-bold text-slate-700">여기를 누르고 티켓, QR 이미지, PDF를 업로드하세요</p>
-                <p className="text-[11px] text-slate-400">호텔 예약번호나 바우처 메모도 함께 정리할 수 있습니다.</p>
+                <p className="text-[10px] sm:text-[11px] text-slate-400">호텔 예약번호나 바우처 메모도 함께 정리할 수 있습니다.</p>
               </div>
 
               {/* 상세 카드 목록 */}
               <div className="space-y-3 overflow-y-auto flex-1 pr-1 min-h-0">
                 {attachments.length === 0 ? (
-                  <div className="py-16 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
+                  <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
                     <p className="text-xs sm:text-sm font-semibold text-slate-500">등록된 예약서류가 없습니다.</p>
-                    <p className="text-xs text-slate-400">상단의 [새 서류 등록]을 눌러 파일과 정보를 입력해보세요.</p>
+                    <p className="text-[11px] text-slate-400">상단의 [등록]을 눌러 파일과 정보를 입력해보세요.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                     {attachments.map((item) => {
                       const Icon = categoryIcons[item.category] || FileText;
 
                       return (
                         <div
                           key={item.id}
-                          className="p-4 bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3 transition group"
+                          className="p-3.5 sm:p-4 bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3 transition group"
                         >
-                          <div className="space-y-2.5">
+                          <div className="space-y-2">
                             {/* 상단 태그 및 수정/삭제 액션 */}
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
+                              <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
                                 <Icon size={12} /> {item.category || '기타'}
                               </span>
 
@@ -404,11 +412,11 @@ export default function AttachmentsPage() {
 
                             {/* 파일명 & 메모 */}
                             <div>
-                              <p className="text-sm font-bold text-slate-900 leading-snug truncate" title={item.file_name}>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug truncate" title={item.file_name}>
                                 {item.file_name}
                               </p>
                               {item.memo && (
-                                <p className="text-xs text-slate-500 mt-1 line-clamp-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <p className="text-[11px] sm:text-xs text-slate-500 mt-1 line-clamp-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                                   📝 {item.memo}
                                 </p>
                               )}
@@ -416,29 +424,29 @@ export default function AttachmentsPage() {
 
                             {/* 예약 번호 복사 바 */}
                             {item.booking_no && (
-                              <div className="flex items-center justify-between bg-slate-100/80 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700">
-                                <span className="truncate">예약번호: <strong className="font-bold text-slate-900">{item.booking_no}</strong></span>
+                              <div className="flex items-center justify-between bg-slate-100/80 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700">
+                                <span className="truncate text-[11px] sm:text-xs">예약번호: <strong className="font-bold text-slate-900">{item.booking_no}</strong></span>
                                 <button
                                   onClick={() => handleCopyBookingNo(item.id, item.booking_no)}
                                   className="text-blue-600 hover:text-blue-800 transition flex items-center gap-1 shrink-0 ml-1 cursor-pointer"
                                   title="예약번호 복사"
                                 >
-                                  {copiedId === item.id ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                                  {copiedId === item.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                                   <span className="text-[10px]">{copiedId === item.id ? '복사됨' : '복사'}</span>
                                 </button>
                               </div>
                             )}
                           </div>
 
-                          {/* 🌟 팝업 열기 + 새 탭 원본 크게 보기(↗) 2개 버튼 세트 복원 */}
-                          <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between">
+                          {/* 열람 및 원본보기 액션 바 */}
+                          <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                             {item.public_url ? (
                               <>
                                 <button
                                   onClick={() => setPreviewUrl(item.public_url)}
                                   className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
                                 >
-                                  <FileText size={14} /> 문서/티켓 열람하기
+                                  <FileText size={13} /> 문서/티켓 열람하기
                                 </button>
                                 <a
                                   href={item.public_url}
@@ -448,7 +456,7 @@ export default function AttachmentsPage() {
                                   title="새 탭 창에서 파일 크게 열기"
                                 >
                                   <span>원본보기</span>
-                                  <ExternalLink size={13} />
+                                  <ExternalLink size={12} />
                                 </a>
                               </>
                             ) : (
@@ -567,7 +575,7 @@ export default function AttachmentsPage() {
         </div>
       )}
 
-      {/* 4. 1초 미리보기 팝업 모달 */}
+      {/* 4. 미리보기 팝업 모달 */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
