@@ -4,23 +4,26 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, 
+  Sparkles,
   Calendar, 
-  CheckSquare, 
-  Wallet, 
   Map, 
   Receipt, 
   Paperclip, 
-  BookOpen, 
-  Image as ImageIcon,
-  Menu,
+  BookOpen,
+  Menu, 
   X,
-  Sparkles
+  CheckSquare,
+  Wallet,
+  PanelLeftClose,
+  PanelLeft,
+  LayoutDashboard,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function Sidebar() {
-  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const pathname = usePathname();
 
   const menuGroups = [
     {
@@ -46,23 +49,28 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* 모바일 상단 네비게이션 바 */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-100 z-40 px-4 flex items-center justify-between shadow-2xs">
-        <Link href="/" className="flex items-center gap-2 font-black text-slate-800 text-base">
-          <div className="w-7 h-7 rounded-xl bg-blue-600 flex items-center justify-center text-white">
-            <Sparkles size={16} />
+      {/* 모바일/패드 전용 상단 헤더 (화면 폭이 좁을 때 노출) */}
+      <div className="lg:hidden flex items-center justify-between p-3.5 bg-white border-b border-slate-100 fixed top-0 left-0 right-0 z-40">
+        <Link 
+          href="/" 
+          onClick={() => setIsOpen(false)}
+          className="flex items-center gap-2 font-black text-lg text-blue-600 hover:opacity-80 transition cursor-pointer"
+        >
+          <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/60 flex items-center justify-center text-blue-600 shrink-0">
+            <Sparkles size={18} />
           </div>
-          SECO LOG
+          <span className="text-base font-extrabold text-slate-800">SECO LOG</span>
         </Link>
         <button
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 text-slate-600 hover:text-slate-900 rounded-lg transition cursor-pointer"
+          className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer"
         >
           {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {/* 모바일 딤 배경 */}
+      {/* 모바일 메뉴 열림 시 배경 오버레이 */}
       {isOpen && (
         <div 
           onClick={() => setIsOpen(false)}
@@ -70,60 +78,89 @@ export default function Sidebar() {
         />
       )}
 
-      {/* 🌟 좌측 고정 사이드바 컨테이너 */}
+      {/* PC 및 가로모드 전용 고정/접이식 사이드바 */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-64 bg-white border-r border-slate-100 z-50 flex flex-col justify-between p-4 sm:p-5 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`
+          fixed top-0 left-0 z-50 h-screen bg-white border-r border-slate-100 flex flex-col justify-between p-4 transition-all duration-300 ease-in-out shrink-0
+          ${isCollapsed ? 'lg:w-16' : 'lg:w-60'}
+          ${isOpen ? 'translate-x-0 shadow-2xl w-60' : '-translate-x-full'}
+          lg:translate-x-0 lg:shadow-none lg:sticky
+        `}
       >
         <div className="space-y-6">
-          {/* 브랜드 로고 */}
-          <Link href="/" className="flex items-center gap-2.5 font-black text-slate-800 text-lg sm:text-xl px-1">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-xs">
-              <Sparkles size={18} />
-            </div>
-            <span>SECO LOG</span>
-          </Link>
+          {/* 상단 로고 & PC 사이드바 토글(축소) 버튼 */}
+          <div className="flex items-center justify-between px-1 py-1">
+            <Link 
+              href="/"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 overflow-hidden group cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/60 flex items-center justify-center text-blue-600 shrink-0">
+                <Sparkles size={18} />
+              </div>
+              {!isCollapsed && (
+                <span className="font-black text-lg text-slate-800 tracking-tight whitespace-nowrap">
+                  SECO LOG
+                </span>
+              )}
+            </Link>
 
-          {/* 메뉴 그룹 내비게이션 */}
-          <nav className="space-y-5 overflow-y-auto max-h-[calc(100vh-160px)] pr-1 no-scrollbar">
-            {menuGroups.map((group) => (
-              <div key={group.groupName} className="space-y-1.5">
-                <p className="text-[11px] font-black text-slate-400 px-3 uppercase tracking-wider">
-                  {group.groupName}
-                </p>
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.path;
+            {/* PC 전용 축소 토글 버튼 */}
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="hidden lg:flex p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+              title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            >
+              {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          </div>
 
-                    return (
-                      <Link
-                        key={item.path}
-                        href={item.path}
-                        onClick={() => setIsOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-blue-50 text-blue-600 shadow-2xs'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                        }`}
-                      >
-                        <Icon size={18} className={isActive ? 'text-blue-600' : 'text-slate-400'} />
-                        <span>{item.name}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+          {/* 메뉴 리스트 */}
+          <nav className="space-y-5 overflow-y-auto max-h-[calc(100vh-140px)] no-scrollbar">
+            {menuGroups.map((group, groupIdx) => (
+              <div key={group.groupName} className="space-y-1">
+                {!isCollapsed ? (
+                  <p className="text-[11px] font-bold text-slate-400 px-2 uppercase tracking-wider mb-2">
+                    {group.groupName}
+                  </p>
+                ) : (
+                  groupIdx > 0 && <div className="my-2 border-t border-slate-100" />
+                )}
+
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.path;
+
+                  return (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-600 font-bold'
+                          : 'text-slate-600 hover:bg-slate-50'
+                      } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                      title={isCollapsed ? item.name : undefined}
+                    >
+                      <Icon size={18} className={`shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                      {!isCollapsed && <span className="truncate text-xs">{item.name}</span>}
+                    </Link>
+                  );
+                })}
               </div>
             ))}
           </nav>
         </div>
 
-        {/* 하단 유저 / 앱 정보 프로필 바 */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 px-1">
-          <span className="font-semibold">SECO LOG v1.0</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500" title="온라인" />
-        </div>
+        {/* 하단 버전 정보 */}
+        {!isCollapsed && (
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 px-1">
+            <span className="font-semibold text-[11px]">SECO LOG v1.0</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" title="온라인" />
+          </div>
+        )}
       </aside>
     </>
   );

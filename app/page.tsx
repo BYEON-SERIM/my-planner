@@ -99,6 +99,7 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
 
+    // 1. schedules 불러오기
     const { data: scheduleData, error: schedError } = await supabase
       .from('schedules')
       .select('*')
@@ -112,34 +113,48 @@ export default function DashboardPage() {
     }
 
     const weekRange = getThisWeekRange();
-    const { data: calData } = await supabase
-      .from('calendar_events')
-      .select('*')
+
+    // 🌟 2. [수정됨] calendar_events 제거 ➔ schedules와 trips로 이번주 일정 집계
+    const { data: weekSchedules } = await supabase
+      .from('schedules')
+      .select('id, title, date, category')
+      .gte('date', weekRange.startStr)
+      .lte('date', weekRange.endStr)
+      .order('date', { ascending: true });
+
+    const { data: tripSchedule } = await supabase
+      .from('trips')
+      .select('id, title, start_date, color')
       .gte('start_date', weekRange.startStr)
-      .lte('start_date', weekRange.endStr)
-      .order('start_date', { ascending: true });
+      .lte('start_date', weekRange.endStr);
 
-    if (calData && calData.length > 0) {
-      setWeeklyEvents(calData);
-    } else {
-      const { data: tripSchedule } = await supabase
-        .from('trips')
-        .select('id, title, start_date, color')
-        .gte('start_date', weekRange.startStr)
-        .lte('start_date', weekRange.endStr);
+    const combinedEvents: CalendarEvent[] = [];
 
-      if (tripSchedule) {
-        setWeeklyEvents(
-          tripSchedule.map((t) => ({
-            id: t.id,
-            title: t.title,
-            start_date: t.start_date,
-            color: t.color,
-          }))
-        );
-      }
+    if (weekSchedules) {
+      weekSchedules.forEach((s) => {
+        combinedEvents.push({
+          id: s.id,
+          title: s.title,
+          start_date: s.date,
+          color: s.category === '업무' ? '#6366f1' : '#3b82f6',
+        });
+      });
     }
 
+    if (tripSchedule) {
+      tripSchedule.forEach((t) => {
+        combinedEvents.push({
+          id: t.id,
+          title: `✈️ ${t.title}`,
+          start_date: t.start_date,
+          color: t.color || '#10b981',
+        });
+      });
+    }
+
+    setWeeklyEvents(combinedEvents);
+
+    // 3. 여행 정보 불러오기
     const { data: tripData } = await supabase
       .from('trips')
       .select('*')
@@ -217,19 +232,31 @@ export default function DashboardPage() {
     const end = new Date(endDateStr);
     end.setHours(0, 0, 0, 0);
 
+    // 1. 여행 중일 때: 상큼한 에메랄드 파스텔
     if (today >= start && today <= end) {
       const diffTime = Math.abs(today.getTime() - start.getTime());
       const currentDayNum = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      return { text: `✈️ 여행 중 (Day ${currentDayNum})`, badgeBg: 'bg-emerald-600' };
+      return { 
+        text: `✈️ 여행 중 (Day ${currentDayNum})`, 
+        badgeBg: 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' 
+      };
     }
 
     const diffTime = start.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+    // 2. 다가오는 여행(D-Day): 또렷하고 산뜻한 블루 소프트 뱃지
     if (diffDays > 0) {
-      return { text: `D-${diffDays}`, badgeBg: 'bg-blue-600' };
+      return { 
+        text: `D-${diffDays}`, 
+        badgeBg: 'bg-blue-50 text-blue-600 border border-blue-200/60' 
+      };
     } else {
-      return { text: `D+${Math.abs(diffDays)} (완료)`, badgeBg: 'bg-slate-600' };
+      // 3. 지난 여행: 차분한 슬레이트 뱃지
+      return { 
+        text: `D+${Math.abs(diffDays)} (완료)`, 
+        badgeBg: 'bg-slate-100 text-slate-500 border border-slate-200/60' 
+      };
     }
   };
 
@@ -284,15 +311,15 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* 2. 메인 영역: 오늘의 To-Do & 금주 일정 */}
+      {/* 2. 메인 영역: 오늘의 To Do & 금주 일정 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
-        {/* 🌟 오늘의 To-Do 헤더 줄바꿈 보정 */}
+        {/* 오늘의 To Do */}
         <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6 flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <CheckSquare className="w-5 h-5 text-blue-600 shrink-0" />
               <h2 className="text-sm sm:text-lg font-black text-slate-900 truncate">
-                오늘의 To-Do
+                오늘의 To Do
               </h2>
             </div>
             <Link href="/todo" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 shrink-0 whitespace-nowrap">
@@ -420,7 +447,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-[10px] sm:text-[11px] font-black text-white px-2 py-0.5 rounded-md shrink-0 ${ddayInfo.badgeBg}`}>
+                  <span className={`text-[10px] sm:text-[11px] font-black px-2.5 py-0.5 rounded-lg shrink-0 ${ddayInfo.badgeBg}`}>
                     {ddayInfo.text}
                   </span>
                   <h3 className="text-xs sm:text-base font-extrabold text-slate-900 truncate">
