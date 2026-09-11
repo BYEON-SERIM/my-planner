@@ -2,18 +2,51 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 import { 
-  CheckCircle2, 
+  Calendar as CalendarIcon, 
+  BookOpen, 
+  Paperclip, 
   Plus, 
-  Trash2, 
-  Calendar, 
-  Tag, 
-  Check, 
-  ChevronLeft,
-  ChevronRight
+  Sparkles, 
+  ChevronRight, 
+  Wallet,
+  MapPin,
+  CheckSquare,
+  Clock,
+  CheckCircle2,
+  Circle,
+  CalendarDays,
+  X,
+  FileText,
+  Check
 } from 'lucide-react';
 
-interface Schedule {
+interface Trip {
+  id: string;
+  title: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  color: string;
+}
+
+interface Expense {
+  id: string;
+  amount: number;
+  payment_method: string;
+}
+
+interface Attachment {
+  id: string;
+  file_name: string;
+  category: string;
+  booking_no: string;
+  public_url: string;
+}
+
+// 🌟 투두 페이지(schedules 테이블)와 스키마 통일
+interface ScheduleItem {
   id: string;
   title: string;
   date: string;
@@ -21,11 +54,26 @@ interface Schedule {
   is_completed: boolean;
 }
 
-export default function TodoPage() {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [title, setTitle] = useState('');
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start_date: string;
+  color?: string;
+}
+
+export default function DashboardPage() {
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [quickAttachments, setQuickAttachments] = useState<Attachment[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [weeklyEvents, setWeeklyEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 팝업 모달 상태
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // 오늘 날짜 YYYY-MM-DD
   const getTodayString = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -34,326 +82,507 @@ export default function TodoPage() {
     return `${year}-${month}-${day}`;
   };
 
-  const [selectedDate, setSelectedDate] = useState(getTodayString());
-  const [category, setCategory] = useState('개인');
-  const [filterMode, setFilterMode] = useState<'all_week' | 'day'>('all_week');
-  const [loading, setLoading] = useState(true);
+  // 이번 주 범위 (월~일)
+  const getThisWeekRange = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
 
-  const categories = ['개인', '업무'];
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distanceToMonday);
+    monday.setHours(0, 0, 0, 0);
 
-  const getWeekDays = () => {
-    const curr = new Date(currentDate);
-    const dayOfWeek = curr.getDay();
-    const sunday = new Date(curr);
-    sunday.setDate(curr.getDate() - dayOfWeek);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
 
-    const week = [];
-    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(sunday);
-      d.setDate(sunday.getDate() + i);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${y}-${m}-${day}`;
-
-      week.push({
-        dateStr,
-        dayNum: d.getDate(),
-        monthNum: d.getMonth() + 1,
-        dayName: dayNames[i],
-        isToday: dateStr === getTodayString(),
-      });
-    }
-    return week;
+    return {
+      startStr: monday.toISOString().split('T')[0],
+      endStr: sunday.toISOString().split('T')[0],
+    };
   };
 
-  const weekDays = getWeekDays();
-  const weekStartDate = weekDays[0].dateStr;
-  const weekEndDate = weekDays[6].dateStr;
-
-  const fetchSchedules = async () => {
+  const fetchDashboardData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // 1. 🌟 schedules 테이블에서 개인/업무 투두 가져오기
+    const { data: scheduleData, error: schedError } = await supabase
       .from('schedules')
       .select('*')
       .order('date', { ascending: true });
 
-    if (!error && data) {
-      const filtered = data.filter(
+    if (!schedError && scheduleData) {
+      const filtered = scheduleData.filter(
         (item) => item.category === '개인' || item.category === '업무'
       );
       setSchedules(filtered);
+    }
+
+    // 2. 이번 주 캘린더 일정
+    const weekRange = getThisWeekRange();
+    const { data: calData } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .gte('start_date', weekRange.startStr)
+      .lte('start_date', weekRange.endStr)
+      .order('start_date', { ascending: true });
+
+    if (calData && calData.length > 0) {
+      setWeeklyEvents(calData);
+    } else {
+      const { data: tripSchedule } = await supabase
+        .from('trips')
+        .select('id, title, start_date, color')
+        .gte('start_date', weekRange.startStr)
+        .lte('start_date', weekRange.endStr);
+
+      if (tripSchedule) {
+        setWeeklyEvents(
+          tripSchedule.map((t) => ({
+            id: t.id,
+            title: t.title,
+            start_date: t.start_date,
+            color: t.color,
+          }))
+        );
+      }
+    }
+
+    // 3. 여행 프로젝트 데이터
+    const { data: tripData } = await supabase
+      .from('trips')
+      .select('*')
+      .order('start_date', { ascending: true });
+
+    if (tripData && tripData.length > 0) {
+      setTrips(tripData);
+
+      const todayStr = getTodayString();
+      const ongoingOrUpcoming = tripData.find((t) => t.end_date >= todayStr) || tripData[0];
+      setActiveTrip(ongoingOrUpcoming);
+
+      if (ongoingOrUpcoming) {
+        const tripId = ongoingOrUpcoming.id;
+
+        const { data: expData } = await supabase
+          .from('expenses')
+          .select('id, amount, payment_method')
+          .eq('trip_id', tripId);
+        if (expData) setExpenses(expData);
+
+        const { data: attachData } = await supabase
+          .from('attachments')
+          .select('*')
+          .eq('trip_id', tripId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        
+        if (attachData && attachData.length > 0) {
+          setQuickAttachments(attachData);
+        } else {
+          const { data: backupAttach } = await supabase
+            .from('trip_attachments')
+            .select('*')
+            .eq('trip_id', tripId)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          if (backupAttach) {
+            setQuickAttachments(
+              backupAttach.map((a: any) => ({
+                id: a.id,
+                file_name: a.file_name || a.title || '예약 서류',
+                category: a.category || '서류',
+                booking_no: a.booking_no || '',
+                public_url: a.public_url || a.file_url || a.url || '',
+              }))
+            );
+          }
+        }
+      }
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchSchedules();
+    fetchDashboardData();
   }, []);
 
-  const handlePrevWeek = () => {
-    const prev = new Date(currentDate);
-    prev.setDate(prev.getDate() - 7);
-    setCurrentDate(prev);
-  };
-
-  const handleNextWeek = () => {
-    const next = new Date(currentDate);
-    next.setDate(next.getDate() + 7);
-    setCurrentDate(next);
-  };
-
-  const handleAddSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    const { error } = await supabase.from('schedules').insert([
-      { title, date: selectedDate, category },
-    ]);
-
-    if (!error) {
-      setTitle('');
-      fetchSchedules();
-    }
-  };
-
+  // 메인에서 완료 체크 토글
   const toggleComplete = async (id: string, currentStatus: boolean) => {
     const { error } = await supabase
       .from('schedules')
       .update({ is_completed: !currentStatus })
       .eq('id', id);
 
-    if (!error) fetchSchedules();
+    if (!error) fetchDashboardData();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('이 할 일을 삭제하시겠습니까?')) return;
+  const calculateDDay = (startDateStr: string, endDateStr: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const { error } = await supabase.from('schedules').delete().eq('id', id);
-    if (!error) fetchSchedules();
+    const start = new Date(startDateStr);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDateStr);
+    end.setHours(0, 0, 0, 0);
+
+    if (today >= start && today <= end) {
+      const diffTime = Math.abs(today.getTime() - start.getTime());
+      const currentDayNum = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return { text: `✈️ 여행 중 (Day ${currentDayNum})`, badgeBg: 'bg-emerald-600' };
+    }
+
+    const diffTime = start.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 0) {
+      return { text: `D-${diffDays}`, badgeBg: 'bg-blue-600' };
+    } else {
+      return { text: `D+${Math.abs(diffDays)} (완료)`, badgeBg: 'bg-slate-600' };
+    }
   };
 
+  // 🌟 오늘 날짜 할 일 계산
+  const todayStr = getTodayString();
+  const todaySchedules = schedules.filter((s) => s.date === todayStr);
+  const remainingTodayCount = todaySchedules.filter((s) => !s.is_completed).length;
+
+  // 이번 주 전체 완료율
+  const weekRange = getThisWeekRange();
   const thisWeekSchedules = schedules.filter(
-    (s) => s.date >= weekStartDate && s.date <= weekEndDate
+    (s) => s.date >= weekRange.startStr && s.date <= weekRange.endStr
   );
-
-  const displaySchedules = thisWeekSchedules.filter((s) => {
-    if (filterMode === 'day') return s.date === selectedDate;
-    return true;
-  });
-
-  const totalCount = thisWeekSchedules.length;
   const completedCount = thisWeekSchedules.filter((s) => s.is_completed).length;
-  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const progressPercent = thisWeekSchedules.length > 0 
+    ? Math.round((completedCount / thisWeekSchedules.length) * 100) 
+    : 0;
+
+  const grandTotal = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  if (loading) {
+    return (
+      <div className="py-20 text-center space-y-2">
+        <Sparkles className="w-6 h-6 text-blue-500 mx-auto animate-pulse" />
+        <p className="text-xs text-slate-400 font-medium">대시보드를 준비하는 중입니다...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 w-full">
-      {/* 1. 주간 헤더 & 진행률 */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-6 w-full pb-8">
+      {/* 1. 상단 대시보드 퀵 서머리 바 */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
+        <div className="flex items-center gap-4 divide-x divide-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+            <span className="text-xs sm:text-sm font-bold text-slate-700">
+              오늘 할 일 <strong className="text-blue-600 font-extrabold">{remainingTodayCount}개</strong> 남음
+            </span>
+          </div>
+          <div className="pl-4 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+            <span className="text-xs sm:text-sm font-bold text-slate-700">
+              금주 일정 <strong className="text-indigo-600 font-extrabold">{thisWeekSchedules.length}개</strong>
+            </span>
+          </div>
+        </div>
+
+        <Link
+          href="/todo"
+          className="text-xs font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition cursor-pointer"
+        >
+          <Plus size={14} /> 새 Task 추가
+        </Link>
+      </div>
+
+      {/* 2. 메인 영역: 오늘의 To-Do & 금주 일정 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* 오늘의 To-Do */}
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-blue-600" />
+              <h2 className="text-base sm:text-lg font-black text-slate-900">오늘의 To-Do ({todayStr})</h2>
+            </div>
+            <Link href="/todo" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              전체보기 ({completedCount}/{thisWeekSchedules.length}) <ChevronRight size={14} />
+            </Link>
+          </div>
+
+          <div className="space-y-2.5 overflow-y-auto flex-1 max-h-[260px]">
+            {todaySchedules.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
+                <p className="text-xs font-semibold text-slate-500">오늘 예정된 할 일이 없습니다.</p>
+                <Link href="/todo" className="text-[11px] font-bold text-blue-600 hover:underline">
+                  + 투두 페이지에서 할 일 추가하기
+                </Link>
+              </div>
+            ) : (
+              todaySchedules.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between transition hover:border-slate-200"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <button
+                      onClick={() => toggleComplete(item.id, item.is_completed)}
+                      className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
+                        item.is_completed
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'border-slate-300 hover:border-blue-500 bg-white'
+                      }`}
+                    >
+                      {item.is_completed && <Check size={13} strokeWidth={3} />}
+                    </button>
+
+                    <span className={`text-xs sm:text-sm font-semibold truncate ${item.is_completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      {item.title}
+                    </span>
+                  </div>
+
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-slate-200 text-blue-600 rounded-md shrink-0 ml-2">
+                    {item.category}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* 주간 달성률 프로그레스 바 */}
+          {thisWeekSchedules.length > 0 && (
+            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+              <div className="flex justify-between text-xs font-bold text-slate-600">
+                <span>주간 투두 달성률</span>
+                <span className="text-blue-600">{progressPercent}%</span>
+              </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 이번 주 스케줄 */}
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-base sm:text-lg font-black text-slate-900">이번 주 스케줄</h2>
+            </div>
+            <Link href="/calendar" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              월간 캘린더 <ChevronRight size={14} />
+            </Link>
+          </div>
+
+          <div className="space-y-2 overflow-y-auto flex-1 max-h-[260px]">
+            {weeklyEvents.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
+                <p className="text-xs font-semibold text-slate-500">이번 주 예정된 일정이 없습니다.</p>
+                <p className="text-[11px] text-slate-400">캘린더에서 자유롭게 일정을 등록해 보세요.</p>
+              </div>
+            ) : (
+              weeklyEvents.map((evt) => (
+                <div
+                  key={evt.id}
+                  className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between transition hover:border-slate-200"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span 
+                      className="w-2.5 h-2.5 rounded-full shrink-0" 
+                      style={{ backgroundColor: evt.color || '#3b82f6' }}
+                    />
+                    <span className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                      {evt.title}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
+                    {evt.start_date}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <Link
+              href="/calendar"
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <Clock size={14} /> 월간 캘린더 전체 일정 보기
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. 부수적 섹션: 여행 프로젝트 요약 카드 */}
+      {activeTrip && (
+        (() => {
+          const ddayInfo = calculateDDay(activeTrip.start_date, activeTrip.end_date);
+          const accentColor = activeTrip.color || '#2563eb';
+
+          return (
+            <div 
+              className="bg-white rounded-2xl border-2 p-5 shadow-2xs space-y-3"
+              style={{ borderColor: accentColor }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-black text-white px-2.5 py-0.5 rounded-md ${ddayInfo.badgeBg}`}>
+                    {ddayInfo.text}
+                  </span>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 truncate">
+                    ✈️ 여행 프로젝트: {activeTrip.title}
+                  </h3>
+                </div>
+
+                {trips.length > 1 && (
+                  <select
+                    value={activeTrip.id}
+                    onChange={(e) => {
+                      const found = trips.find((t) => t.id === e.target.value);
+                      if (found) {
+                        setActiveTrip(found);
+                        fetchDashboardData();
+                      }
+                    }}
+                    className="text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg outline-none cursor-pointer"
+                  >
+                    {trips.map((t) => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <MapPin size={13} className="text-slate-400" /> {activeTrip.destination}
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                    <CalendarIcon size={13} className="text-slate-400" /> {activeTrip.start_date} ~ {activeTrip.end_date}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href="/diaries"
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <BookOpen size={13} /> 포토 일기
+                  </Link>
+                  <Link
+                    href="/trips"
+                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  >
+                    프로젝트 상세 <ChevronRight size={13} />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      {/* 4. 하단 서브 위젯: 경비 & 서류 보관함 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 flex flex-col justify-between space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+              <Wallet size={14} className="text-emerald-600" /> 여행 경비 요약
+            </p>
+            <Link href="/expenses" className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-0.5">
+              가계부 열기 <ChevronRight size={12} />
+            </Link>
+          </div>
+
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6 text-blue-600" />
-              주간 투두 체크리스트
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {weekDays[0].monthNum}월 {weekDays[0].dayNum}일 ~ {weekDays[6].monthNum}월 {weekDays[6].dayNum}일 주간 단위 관리
+            <p className="text-[11px] font-bold text-slate-400">총 누적 지출금액</p>
+            <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
+              ₩{grandTotal.toLocaleString()}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-50 px-3.5 py-1.5 rounded-xl border border-blue-100 flex items-center gap-2">
-              <span className="text-xs font-semibold text-blue-600">주간 달성률</span>
-              <span className="text-sm font-bold text-blue-700">{progressPercent}%</span>
-            </div>
-
-            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
-              <button onClick={handlePrevWeek} className="p-1 rounded-lg hover:bg-white text-slate-600 cursor-pointer">
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  setCurrentDate(new Date());
-                  setSelectedDate(getTodayString());
-                }}
-                className="px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-white transition rounded-lg cursor-pointer"
-              >
-                이번 주
-              </button>
-              <button onClick={handleNextWeek} className="p-1 rounded-lg hover:bg-white text-slate-600 cursor-pointer">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-          <div 
-            className="bg-blue-600 h-full transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      {/* 2. 주간 요일 캘린더 탭 */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <button
-            onClick={() => setFilterMode('all_week')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
-              filterMode === 'all_week'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'text-slate-500 hover:bg-slate-50'
-            }`}
+          <Link
+            href="/expenses"
+            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
           >
-            📅 주간 전체 모아보기 ({thisWeekSchedules.length})
-          </button>
-          <span className="text-[11px] text-slate-400">날짜를 클릭하면 해당 일만 필터링됩니다.</span>
+            <Plus size={14} /> 지출 추가하기
+          </Link>
         </div>
 
-        <div className="grid grid-cols-7 gap-1.5">
-          {weekDays.map((w) => {
-            const daySchedules = thisWeekSchedules.filter((s) => s.date === w.dateStr);
-            const isSelected = filterMode === 'day' && selectedDate === w.dateStr;
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 shadow-xs p-5 space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+              <Paperclip size={14} className="text-blue-600" /> 보관된 예약 서류 ({quickAttachments.length}개)
+            </p>
+            <Link href="/attachments" className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-0.5">
+              전체 서류함 <ChevronRight size={12} />
+            </Link>
+          </div>
 
-            return (
-              <button
-                key={w.dateStr}
-                onClick={() => {
-                  setSelectedDate(w.dateStr);
-                  setFilterMode('day');
-                }}
-                className={`p-2 rounded-xl flex flex-col items-center transition cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-50 border-2 border-blue-500 font-bold text-blue-600 shadow-2xs'
-                    : w.isToday
-                    ? 'bg-slate-100 font-bold text-slate-900'
-                    : 'bg-slate-50/70 hover:bg-slate-100 text-slate-700'
-                }`}
-              >
-                <span className={`text-[10px] ${w.dayName === '일' ? 'text-red-500' : w.dayName === '토' ? 'text-blue-500' : 'text-slate-400'}`}>
-                  {w.dayName}
-                </span>
-                <span className="text-sm font-extrabold my-0.5">{w.dayNum}</span>
-                {daySchedules.length > 0 && (
-                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 font-bold">
-                    {daySchedules.length}
+          <div className="space-y-2">
+            {quickAttachments.length === 0 ? (
+              <div className="py-6 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
+                <p className="text-xs font-semibold text-slate-500">등록된 바우처 서류가 없습니다.</p>
+                <Link href="/attachments" className="text-[11px] font-bold text-blue-600 hover:underline">
+                  + 새 서류/티켓 등록하기
+                </Link>
+              </div>
+            ) : (
+              quickAttachments.map((doc) => (
+                <div key={doc.id} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="truncate flex items-center gap-2 pr-2 min-w-0">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-white text-blue-600 rounded border border-slate-200 shrink-0">
+                      {doc.category || '서류'}
+                    </span>
+                    <span className="truncate text-slate-800 font-semibold">{doc.file_name}</span>
                   </span>
-                )}
-              </button>
-            );
-          })}
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {doc.public_url ? (
+                      <button
+                        onClick={() => setPreviewUrl(doc.public_url)}
+                        className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                      >
+                        미리보기
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 font-normal">파일 없음</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 3. 할 일 입력 폼 */}
-      <form onSubmit={handleAddSchedule} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
-          <Plus className="text-slate-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="할 일을 입력하세요..."
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-sm font-medium outline-none text-slate-900 placeholder:text-slate-400"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs text-slate-700">
-              <Calendar size={14} className="text-slate-400" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setFilterMode('day');
-                }}
-                className="bg-transparent outline-none cursor-pointer font-medium"
-              />
+      {/* 5. 1초 미리보기 팝업 모달 */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 shrink-0">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <FileText size={16} className="text-blue-600" /> 예약 서류 / 티켓 팝업
+              </h3>
+              <button onClick={() => setPreviewUrl(null)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X size={18} />
+              </button>
             </div>
-
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs text-slate-700">
-              <Tag size={14} className="text-slate-400" />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="bg-transparent outline-none cursor-pointer font-medium"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+            <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-100/50">
+              {previewUrl.toLowerCase().includes('.pdf') ? (
+                <iframe src={previewUrl} className="w-full h-[60vh] rounded-xl" title="PDF 미리보기" />
+              ) : (
+                <img src={previewUrl} alt="서류/QR 미리보기" className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-xs" />
+              )}
             </div>
           </div>
-
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-4 py-2 rounded-xl transition active:scale-95 shadow-sm shadow-blue-500/20 ml-auto cursor-pointer"
-          >
-            추가하기
-          </button>
         </div>
-      </form>
-
-      {/* 4. 할 일 리스트 */}
-      {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">목록을 불러오는 중...</div>
-      ) : displaySchedules.length === 0 ? (
-        <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl">
-          <p className="text-slate-400 text-sm font-medium">선택된 기간에 등록된 할 일이 없습니다.</p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {displaySchedules.map((item) => (
-            <li
-              key={item.id}
-              className="group flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-xs transition"
-            >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <button
-                  onClick={() => toggleComplete(item.id, item.is_completed)}
-                  className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer ${
-                    item.is_completed
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'border-slate-300 hover:border-blue-500 bg-white'
-                  }`}
-                >
-                  {item.is_completed && <Check size={14} strokeWidth={3} />}
-                </button>
-
-                <span
-                  className={`text-sm font-medium truncate ${
-                    item.is_completed ? 'line-through text-slate-400' : 'text-slate-900'
-                  }`}
-                >
-                  {item.title}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 ml-3 shrink-0">
-                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
-                  {item.category}
-                </span>
-
-                <span className="text-xs text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 font-medium">
-                  {item.date}
-                </span>
-
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100 cursor-pointer"
-                  aria-label="삭제"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  CheckCircle2, 
   Sparkles,
   Calendar, 
   Map, 
@@ -15,7 +14,8 @@ import {
   X,
   CheckSquare,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  LayoutDashboard
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -27,6 +27,7 @@ export default function Sidebar() {
     {
       groupName: '개인 관리',
       items: [
+        { name: '대시보드 홈', path: '/', icon: LayoutDashboard },
         { name: '캘린더', path: '/calendar', icon: Calendar },
         { name: 'To-Do 체크리스트', path: '/todo', icon: CheckSquare },
       ],
@@ -41,14 +42,21 @@ export default function Sidebar() {
       ],
     },
   ];
+
   return (
     <>
-      {/* 모바일/패드 세로 상단 헤더 */}
+      {/* 모바일/패드 상단 헤더 (로고 클릭 시 메인으로 이동) */}
       <div className="lg:hidden flex items-center justify-between p-3.5 bg-white border-b border-slate-100 sticky top-0 z-40">
-        <div className="flex items-center gap-2 font-black text-lg text-blue-600">
-          <CheckCircle2 className="w-5 h-5" />
+        <Link 
+          href="/" 
+          onClick={() => setIsOpen(false)}
+          className="flex items-center gap-2 font-black text-lg text-blue-600 hover:opacity-80 transition cursor-pointer"
+        >
+          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0">
+            <Sparkles size={16} />
+          </div>
           <span className="text-base font-extrabold text-slate-800">SECO LOG</span>
-        </div>
+        </Link>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer"
@@ -57,7 +65,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* 가로 모드 및 PC용 접이식 사이드바 */}
+      {/* PC 및 가로모드 전용 접이식 사이드바 */}
       <aside
         className={`
           fixed top-0 left-0 z-50 min-h-screen h-full bg-white border-r border-slate-100 flex flex-col justify-between p-4 transition-all duration-300 ease-in-out shrink-0
@@ -67,10 +75,14 @@ export default function Sidebar() {
         `}
       >
         <div className="space-y-6">
-          {/* 상단 로고 및 접기 버튼 */}
+          {/* 상단 로고 (클릭 시 메인 홈 이동) 및 접기 버튼 */}
           <div className="flex items-center justify-between px-1 py-1">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+            <Link 
+              href="/"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 overflow-hidden group cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0 group-hover:scale-105 transition">
                 <Sparkles size={18} />
               </div>
               {!isCollapsed && (
@@ -78,7 +90,7 @@ export default function Sidebar() {
                   SECO LOG
                 </span>
               )}
-            </div>
+            </Link>
 
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
@@ -89,11 +101,10 @@ export default function Sidebar() {
             </button>
           </div>
 
-          {/* 중메뉴 그룹 구조 재적용 */}
+          {/* 메뉴 리스트 */}
           <nav className="space-y-5">
             {menuGroups.map((group, groupIdx) => (
               <div key={group.groupName} className="space-y-1">
-                {/* 그룹 구분 텍스트 (사이드바가 펼쳐져 있을 때 복구 표시) */}
                 {!isCollapsed ? (
                   <p className="text-[11px] font-bold text-slate-400 px-2 uppercase tracking-wider mb-2">
                     {group.groupName}
@@ -102,7 +113,6 @@ export default function Sidebar() {
                   groupIdx > 0 && <div className="my-2 border-t border-slate-100" />
                 )}
 
-                {/* 하위 메뉴 아이템 */}
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.path;
@@ -128,18 +138,6 @@ export default function Sidebar() {
             ))}
           </nav>
         </div>
-
-        {/* 하단 프로필 */}
-        {/* <div className={`p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-          <div className="w-7 h-7 rounded-lg bg-blue-600 text-white font-extrabold text-[10px] flex items-center justify-center shrink-0">
-            ME
-          </div>
-          {!isCollapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-slate-800 truncate">개인 플래너</p>
-            </div>
-          )}
-        </div> */}
       </aside>
     </>
   );
