@@ -17,16 +17,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className={`${inter.className} bg-white text-slate-900 flex flex-col lg:flex-row min-h-screen overflow-x-hidden`}>
-        {/* 접이식 사이드바 */}
-        <Sidebar />
-
-        {/* 웹 화면에서 사이드 여백을 더 줄인 메인 레이아웃 (max-w-[1400px] 적용) */}
-        <main className="flex-1 py-4 px-3 sm:px-4 lg:px-6 overflow-y-auto pb-16 lg:pb-6 bg-white w-full min-w-0">
-          <div className="max-w-[1400px] mx-auto w-full">
-            {children}
-          </div>
-        </main>
+      <body className="bg-slate-50/50 text-slate-900 antialiased font-['Pretendard']">
+        <div className="min-h-screen flex flex-col lg:flex-row">
+          <Sidebar />
+          <main className="flex-1 lg:pl-64 pt-14 lg:pt-0 min-w-0 transition-all">
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </body>
     </html>
   );

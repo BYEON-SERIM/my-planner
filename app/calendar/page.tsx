@@ -68,7 +68,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
 
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const categories = ['개인', '업무', '약속', '여행', '운동'];
+  const categories = ['개인', '업무', '약속', '여행', '운동', '생일'];
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const colorOptions = [
