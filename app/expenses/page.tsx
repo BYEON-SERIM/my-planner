@@ -17,7 +17,9 @@ import {
   CreditCard,
   RefreshCw,
   PieChart,
-  List
+  List,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface Trip {
@@ -48,6 +50,9 @@ export default function ExpensesPage() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 모바일 여행 리스트 토글 상태
+  const [isMobileTripListOpen, setIsMobileTripListOpen] = useState(false);
 
   // 모바일 전용 뷰 탭 상태 ('list' | 'summary')
   const [mobileViewTab, setMobileViewTab] = useState<'list' | 'summary'>('list');
@@ -225,7 +230,7 @@ export default function ExpensesPage() {
   const usagePercent = totalExchanged > 0 ? Math.min(Math.round((totalSpentCash / totalExchanged) * 100), 100) : 0;
 
   return (
-    <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
+    <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
       {/* 1. 상단 타이틀 바 */}
       <div className="flex items-center justify-between gap-2 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
         <div className="min-w-0 flex-1">
@@ -274,17 +279,39 @@ export default function ExpensesPage() {
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
-        {/* 좌측 여행 선택 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[160px] max-h-[220px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
-            <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
-            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
-              총 {trips.length}개
-            </span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
+        
+        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
+          
+          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 표시) */}
+          <div 
+            onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
+            className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
+              {selectedTrip && (
+                <span className="text-[11px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px] lg:hidden">
+                  📍 {selectedTrip.title}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+                총 {trips.length}개
+              </span>
+              <button type="button" className="lg:hidden text-slate-400 p-0.5">
+                {isMobileTripListOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
+          <div className={`space-y-2 overflow-y-auto flex-1 pr-1 transition-all ${
+            isMobileTripListOpen ? 'mt-3 max-h-[200px] block' : 'hidden lg:block'
+          }`}>
             {loading ? (
               <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
@@ -297,7 +324,10 @@ export default function ExpensesPage() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => {
+                      setSelectedTrip(trip);
+                      setIsMobileTripListOpen(false); // 모바일에서 선택 후 닫기
+                    }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
                         ? 'bg-slate-50/80 shadow-2xs font-bold'
@@ -348,7 +378,7 @@ export default function ExpensesPage() {
                 </button>
               </div>
 
-              {/* 🌟 모바일 전용 항상 노출되는 상단 미니 잔액 바 (지출 항목 탭일 때 노출) */}
+              {/* 모바일 전용 상단 미니 잔액 바 (지출 항목 탭일 때 노출) */}
               {mobileViewTab === 'list' && (
                 <div className="lg:hidden bg-amber-50/90 border border-amber-200/80 p-2.5 rounded-xl flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
@@ -359,11 +389,11 @@ export default function ExpensesPage() {
                     <span className="text-sm font-black text-slate-900">
                       {remainingCash.toLocaleString()} {selectedTrip.currency_unit || '엔'}
                     </span>
-                    {/* {exchangeRate > 0 && (
+                    {exchangeRate > 0 && (
                       <span className="text-[10px] text-slate-400 font-semibold ml-1">
                         (약 ₩{Math.round(remainingCash * exchangeRate).toLocaleString()}원)
                       </span>
-                    )} */}
+                    )}
                   </div>
                 </div>
               )}

@@ -19,6 +19,8 @@ import {
   Palette,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Paperclip,
   ExternalLink
 } from 'lucide-react';
@@ -66,6 +68,9 @@ export default function TripsPage() {
   const [availableAttachments, setAvailableAttachments] = useState<AttachmentItem[]>([]);
   
   const [activeTab, setActiveTab] = useState<'timeline' | 'packing' | 'shopping'>('timeline');
+
+  // 모바일 여행 리스트 토글 상태
+  const [isMobileTripListOpen, setIsMobileTripListOpen] = useState(false);
 
   const [activeDayNum, setActiveDayNum] = useState<number>(1);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -311,8 +316,8 @@ export default function TripsPage() {
           trip_id: selectedTrip.id,
           day_num: selectedDayNum,
           plan_time: planTime,
-          content: planContent,   // 👈 일정 내용으로 저장
-          location: planLocation, // 👈 장소 정보로 저장 (구글 맵 검색용)
+          content: planContent,
+          location: planLocation,
           attachment_id: selectedAttachmentId || null,
         },
       ]);
@@ -408,8 +413,8 @@ export default function TripsPage() {
   const shoppingItems = tripItems.filter((i) => i.type === 'shopping');
 
   return (
-    <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
-      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+    <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
+      {/* 1. 상단 타이틀 바 */}
       <div className="flex items-center justify-between gap-2.5 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
         <div className="min-w-0">
           <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
@@ -421,7 +426,6 @@ export default function TripsPage() {
           </p>
         </div>
 
-        {/* 🌟 소프트 블루 디자인 버튼 적용 */}
         <button
           onClick={() => {
             resetForm();
@@ -436,17 +440,39 @@ export default function TripsPage() {
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
-        {/* 좌측 여행 리스트 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[180px] max-h-[250px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
-            <h2 className="text-xs sm:text-base font-bold text-slate-800">내 여행 리스트</h2>
-            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
-              총 {trips.length}개
-            </span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
+        
+        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 리스트 영역 */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
+          
+          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 헤더 유지) */}
+          <div 
+            onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
+            className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-xs sm:text-base font-bold text-slate-800">내 여행 리스트</h2>
+              {selectedTrip && (
+                <span className="text-[11px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px] lg:hidden">
+                  📍 {selectedTrip.title}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+                총 {trips.length}개
+              </span>
+              <button type="button" className="lg:hidden text-slate-400 p-0.5">
+                {isMobileTripListOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
+          <div className={`space-y-2.5 overflow-y-auto flex-1 pr-1 transition-all ${
+            isMobileTripListOpen ? 'mt-3 max-h-[220px] block' : 'hidden lg:block'
+          }`}>
             {loading ? (
               <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
@@ -464,7 +490,10 @@ export default function TripsPage() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => {
+                      setSelectedTrip(trip);
+                      setIsMobileTripListOpen(false); // 모바일에서 여행 선택 후 토글 자동 닫기
+                    }}
                     className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2 ${
                       isSelected
                         ? 'bg-slate-50/50 shadow-2xs'
@@ -670,18 +699,13 @@ export default function TripsPage() {
                                     </div>
                                     <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{plan.content}</p>
                                     
-                                    {/* {plan.location && (
-                                      <p className="text-xs text-slate-400 flex items-center gap-1 pt-0.5">
-                                        <MapPin size={12} /> {plan.location}
-                                      </p>
-                                    )} */}
                                     {plan.location && (
                                       <p className="pt-0.5">
                                         <a
                                           href={
                                             plan.location.trim().startsWith('http')
-                                              ? plan.location.trim() // 🔗 구글 맵 원본 URL은 있는 그대로 직접 열기
-                                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plan.location.trim())}` // 🔍 텍스트일 때만 검색 주소로 생성
+                                              ? plan.location.trim()
+                                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plan.location.trim())}`
                                           }
                                           target="_blank"
                                           rel="noreferrer"
@@ -698,7 +722,6 @@ export default function TripsPage() {
                                       </p>
                                     )}
 
-                                    {/* 연동된 티켓/문서 바 */}
                                     {plan.attachment && (
                                       <div className="pt-1.5">
                                         <a
@@ -846,7 +869,6 @@ export default function TripsPage() {
                 />
               </div>
 
-              {/* 🌟 모바일 반응형 grid-cols-1 sm:grid-cols-2 줄바꿈 적용 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1 block">시작일</label>
@@ -1080,7 +1102,6 @@ export default function TripsPage() {
                 />
               </div>
 
-              {/* 저장된 티켓 서류 매핑 드롭다운 */}
               <div>
                 <label className="text-xs font-bold text-slate-400 mb-1 block">연동할 티켓/바우처 서류 (선택)</label>
                 <select

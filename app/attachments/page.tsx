@@ -19,7 +19,8 @@ import {
   X,
   Pencil,
   Maximize2,
-  Plus
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface Trip {
@@ -53,6 +54,9 @@ export default function AttachmentsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // 모바일 여행 리스트 토글 상태
+  const [isMobileTripListOpen, setIsMobileTripListOpen] = useState(false);
 
   // 등록 및 수정 모달 상태
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -263,8 +267,8 @@ export default function AttachmentsPage() {
   };
 
   return (
-    <div className="space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
-      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+    <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
+      {/* 1. 상단 타이틀 바 */}
       <div className="flex items-center justify-between gap-2.5 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs shrink-0">
         <div className="min-w-0">
           <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
@@ -277,29 +281,51 @@ export default function AttachmentsPage() {
         </div>
 
         {selectedTrip && (
-            <button
+          <button
             onClick={handleOpenAddModal}
             className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
-        >
+          >
             <Upload size={16} className="shrink-0" />
             <span className="hidden sm:inline">새 서류 등록</span>
             <span className="sm:hidden">등록</span>
-        </button>
+          </button>
         )}
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 flex-1 min-h-0">
-        {/* 좌측 여행 선택 */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col min-h-[160px] max-h-[220px] lg:max-h-none lg:min-h-0">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-2.5 shrink-0">
-            <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
-            <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
-              총 {trips.length}개
-            </span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
+        
+        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
+          
+          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 헤더 유지) */}
+          <div 
+            onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
+            className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-xs sm:text-base font-bold text-slate-800">여행 선택</h2>
+              {selectedTrip && (
+                <span className="text-[11px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md truncate max-w-[150px] lg:hidden">
+                  📍 {selectedTrip.title}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] sm:text-xs font-semibold bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full">
+                총 {trips.length}개
+              </span>
+              <button type="button" className="lg:hidden text-slate-400 p-0.5">
+                {isMobileTripListOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
+          <div className={`space-y-2 overflow-y-auto flex-1 pr-1 transition-all ${
+            isMobileTripListOpen ? 'mt-3 max-h-[220px] block' : 'hidden lg:block'
+          }`}>
             {loading ? (
               <p className="text-xs sm:text-sm text-slate-400 py-6 text-center">불러오는 중...</p>
             ) : trips.length === 0 ? (
@@ -315,7 +341,10 @@ export default function AttachmentsPage() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
+                    onClick={() => {
+                      setSelectedTrip(trip);
+                      setIsMobileTripListOpen(false); // 모바일에서 선택 후 자동 닫기
+                    }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
                         ? 'bg-slate-50/50 shadow-2xs font-bold'
@@ -345,7 +374,7 @@ export default function AttachmentsPage() {
         <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-5 flex flex-col min-h-[400px] lg:min-h-0">
           {selectedTrip ? (
             <div className="flex flex-col h-full space-y-3.5">
-              {/* 🌟 서류 목록 헤더 보정 */}
+              {/* 서류 목록 헤더 */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 shrink-0 gap-2">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <FileCheck className="text-blue-600 shrink-0" size={18} />
