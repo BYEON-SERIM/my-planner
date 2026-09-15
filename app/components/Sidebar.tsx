@@ -51,23 +51,25 @@ export default function Sidebar() {
     <>
       {/* 모바일/패드 전용 상단 헤더 (화면 폭이 좁을 때 노출) */}
       <div className="lg:hidden flex items-center justify-between p-3.5 bg-white border-b border-slate-100 fixed top-0 left-0 right-0 z-40">
-        <Link 
+        {/* 1. 왼쪽: 햄버거 메뉴 버튼 + 반짝이는 아이콘 */}
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer shrink-0"
+          >
+            {isOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          
+          <Link 
           href="/" 
           onClick={() => setIsOpen(false)}
-          className="flex items-center gap-2 font-black text-lg text-blue-600 hover:opacity-80 transition cursor-pointer"
+          className="font-black text-base text-slate-800 hover:opacity-80 transition cursor-pointer tracking-tight"
         >
-          <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/60 flex items-center justify-center text-blue-600 shrink-0">
-            <Sparkles size={18} />
-          </div>
-          <span className="text-base font-extrabold text-slate-800">SECO LOG</span>
+          SECO LOG
         </Link>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-        >
-          {isOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        </div>
+ 
       </div>
 
       {/* 모바일 메뉴 열림 시 배경 오버레이 */}

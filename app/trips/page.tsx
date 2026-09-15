@@ -311,8 +311,8 @@ export default function TripsPage() {
           trip_id: selectedTrip.id,
           day_num: selectedDayNum,
           plan_time: planTime,
-          content: planContent,
-          location: planLocation,
+          content: planContent,   // 👈 일정 내용으로 저장
+          location: planLocation, // 👈 장소 정보로 저장 (구글 맵 검색용)
           attachment_id: selectedAttachmentId || null,
         },
       ]);
@@ -670,9 +670,31 @@ export default function TripsPage() {
                                     </div>
                                     <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{plan.content}</p>
                                     
-                                    {plan.location && (
+                                    {/* {plan.location && (
                                       <p className="text-xs text-slate-400 flex items-center gap-1 pt-0.5">
                                         <MapPin size={12} /> {plan.location}
+                                      </p>
+                                    )} */}
+                                    {plan.location && (
+                                      <p className="pt-0.5">
+                                        <a
+                                          href={
+                                            plan.location.trim().startsWith('http')
+                                              ? plan.location.trim() // 🔗 구글 맵 원본 URL은 있는 그대로 직접 열기
+                                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plan.location.trim())}` // 🔍 텍스트일 때만 검색 주소로 생성
+                                          }
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium transition cursor-pointer"
+                                          title="구글 맵에서 위치 확인하기"
+                                        >
+                                          <MapPin size={12} className="text-blue-600 shrink-0" />
+                                          <span className="truncate max-w-[180px]">
+                                            {plan.location.trim().startsWith('http') ? '구글 맵 장소 열기' : plan.location}
+                                          </span>
+                                          <ExternalLink size={10} className="text-blue-400 shrink-0" />
+                                        </a>
                                       </p>
                                     )}
 
@@ -1046,10 +1068,12 @@ export default function TripsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-400 mb-1 block">장소 / 메모 (선택)</label>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">
+                  장소 (구글 맵 검색)
+                </label>
                 <input
                   type="text"
-                  placeholder="예: 간사이 공항 터미널 1"
+                  placeholder="예: 신사이바시, 도카이도 신칸센"
                   value={planLocation}
                   onChange={(e) => setPlanLocation(e.target.value)}
                   className="w-full text-xs sm:text-sm font-medium text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
