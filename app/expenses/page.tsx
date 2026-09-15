@@ -359,11 +359,11 @@ export default function ExpensesPage() {
                     <span className="text-sm font-black text-slate-900">
                       {remainingCash.toLocaleString()} {selectedTrip.currency_unit || '엔'}
                     </span>
-                    {exchangeRate > 0 && (
+                    {/* {exchangeRate > 0 && (
                       <span className="text-[10px] text-slate-400 font-semibold ml-1">
                         (약 ₩{Math.round(remainingCash * exchangeRate).toLocaleString()}원)
                       </span>
-                    )}
+                    )} */}
                   </div>
                 </div>
               )}
