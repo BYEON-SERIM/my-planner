@@ -194,6 +194,12 @@ export default function ExpensesPage() {
     e.preventDefault();
     if (!selectedTrip || !expenseTitle.trim()) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
     const finalAmount = parseFloat(amount) || 0;
     const calcKrw = exchangeRate > 0 ? Math.round(finalAmount * exchangeRate) : finalAmount;
 
@@ -206,6 +212,7 @@ export default function ExpensesPage() {
         amount_krw: calcKrw,
         payment_method: paymentMethod,
         expense_date: expenseDate,
+        user_id: user.id 
       },
     ]);
 

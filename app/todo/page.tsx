@@ -114,11 +114,22 @@ export default function TodoPage() {
   const handleAddSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-
+  
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+  
     const { error } = await supabase.from('schedules').insert([
-      { title, date: selectedDate, category },
+      { 
+        title, 
+        date: selectedDate, 
+        category,
+        user_id: user.id 
+      },
     ]);
-
+  
     if (!error) {
       setTitle('');
       fetchSchedules();

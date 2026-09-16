@@ -22,7 +22,8 @@ import {
   ChevronDown,
   ChevronUp,
   Paperclip,
-  ExternalLink
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 
 interface Trip {
@@ -32,6 +33,8 @@ interface Trip {
   start_date: string;
   end_date: string;
   color: string;
+  share_token?: string;
+  is_public?: boolean;
 }
 
 interface TripItem {
@@ -68,15 +71,13 @@ export default function TripsPage() {
   const [availableAttachments, setAvailableAttachments] = useState<AttachmentItem[]>([]);
   
   const [activeTab, setActiveTab] = useState<'timeline' | 'packing' | 'shopping'>('timeline');
-
-  // 모바일 여행 리스트 토글 상태
   const [isMobileTripListOpen, setIsMobileTripListOpen] = useState(false);
 
   const [activeDayNum, setActiveDayNum] = useState<number>(1);
   const sliderRef = useRef<HTMLDivElement>(null);
   const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // 여행 프로젝트 모달
+  // 모달 상태
   const [isAddTripModalOpen, setIsAddTripModalOpen] = useState(false);
   const [isEditTripModalOpen, setIsEditTripModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -96,7 +97,6 @@ export default function TripsPage() {
     { label: '인디고', value: '#6366f1' },
   ];
 
-  // 타임라인 일정 추가 / 수정 모달 상태
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<TripPlan | null>(null);
   const [selectedDayNum, setSelectedScheduleDayNum] = useState<number>(1);
@@ -159,6 +159,35 @@ export default function TripsPage() {
       setActiveDayNum(1);
     }
   }, [selectedTrip]);
+
+  // 🌟 동행자 초대를 위한 공유 링크 생성 핸들러
+  const handleShareTrip = async (trip: Trip, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    try {
+      let token = trip.share_token;
+
+      // 공유 토큰이 없는 경주 자동 생성 후 저장
+      if (!token) {
+        token = crypto.randomUUID();
+        await supabase
+          .from('trips')
+          .update({ is_public: true, share_token: token })
+          .eq('id', trip.id);
+      } else {
+        await supabase
+          .from('trips')
+          .update({ is_public: true })
+          .eq('id', trip.id);
+      }
+
+      const shareUrl = `${window.location.origin}/trips/join?token=${token}`;
+      await navigator.clipboard.writeText(shareUrl);
+      alert('🌟 여행 초대를 위한 공유 링크가 복사되었습니다!\n이 링크로 접속 후 구글 로그인 시 동행자로 합류되어 데이터를 함께 조회/수정할 수 있습니다.');
+    } catch (err) {
+      alert('공유 링크 복사에 실패했습니다.');
+    }
+  };
 
   const calculateNights = (startStr: string, endStr: string) => {
     const start = new Date(startStr);
@@ -399,7 +428,6 @@ export default function TripsPage() {
     return days;
   };
 
-  // 🌟 스와이프 시 상단 Day 탭을 실시간 동기화 및 자동으로 화면 중앙 스크롤 이동
   const handleScroll = () => {
     if (!sliderRef.current) return;
     const { scrollLeft, clientWidth } = sliderRef.current;
@@ -465,7 +493,7 @@ export default function TripsPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 좌측: 모바일 토글형 / PC 고정형 여행 리스트 영역 */}
+        {/* 좌측 여행 리스트 영역 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
           
           <div 
@@ -550,6 +578,14 @@ export default function TripsPage() {
                       </span>
                       
                       <div className="flex items-center gap-1">
+                        {/* 🌟 여행 카드 내 공유 버튼 */}
+                        <button
+                          onClick={(e) => handleShareTrip(trip, e)}
+                          className="p-1 text-slate-400 hover:text-emerald-600 transition cursor-pointer"
+                          title="동행자 초대 링크 복사"
+                        >
+                          <Share2 size={13} />
+                        </button>
                         <button
                           onClick={(e) => handleOpenEditModal(trip, e)}
                           className="p-1 hover:text-blue-600 transition opacity-60 hover:opacity-100 cursor-pointer"
@@ -579,18 +615,30 @@ export default function TripsPage() {
             <div className="flex flex-col h-full space-y-3.5">
               {/* 상단 탭 헤더 */}
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-100 pb-2.5 shrink-0">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full shrink-0 shadow-xs" 
-                      style={{ backgroundColor: selectedTrip.color || '#3b82f6' }}
-                    />
-                    <h2 className="text-xs sm:text-lg font-bold text-slate-900 truncate">{selectedTrip.title}</h2>
-                    <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                      {calculateNights(selectedTrip.start_date, selectedTrip.end_date)}
-                    </span>
+                <div className="flex items-center justify-between w-full xl:w-auto">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full shrink-0 shadow-xs" 
+                        style={{ backgroundColor: selectedTrip.color || '#3b82f6' }}
+                      />
+                      <h2 className="text-xs sm:text-lg font-bold text-slate-900 truncate">{selectedTrip.title}</h2>
+                      <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                        {calculateNights(selectedTrip.start_date, selectedTrip.end_date)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">📍 {selectedTrip.destination} | {selectedTrip.start_date} ~ {selectedTrip.end_date}</p>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">📍 {selectedTrip.destination} | {selectedTrip.start_date} ~ {selectedTrip.end_date}</p>
+
+                  {/* 🌟 여행 상세 상단 공유 버튼 */}
+                  <button
+                    onClick={() => handleShareTrip(selectedTrip)}
+                    className="ml-2 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                    title="동행자 공유 링크 생성"
+                  >
+                    <Share2 size={14} />
+                    <span className="hidden sm:inline">공유</span>
+                  </button>
                 </div>
 
                 <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 w-full xl:w-auto">
@@ -624,7 +672,7 @@ export default function TripsPage() {
               {/* 탭 1: Day 타임라인 */}
               {activeTab === 'timeline' && (
                 <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                  {/* Day 선택 탭 헤더 (가로 스크롤바 완전 가림) */}
+                  {/* Day 선택 탭 헤더 */}
                   <div 
                     className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
@@ -650,7 +698,6 @@ export default function TripsPage() {
                       ))}
                     </div>
 
-                    {/* PC 전용 화살표 (모바일 hidden) */}
                     <div className="hidden lg:flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => scrollToDay(Math.max(1, activeDayNum - 1))}
@@ -669,7 +716,7 @@ export default function TripsPage() {
                     </div>
                   </div>
 
-                  {/* 스와이프 슬라이더 (가로 스크롤바 완전 숨김 + onScroll 자동연동) */}
+                  {/* 스와이프 슬라이더 */}
                   <div 
                     ref={sliderRef}
                     onScroll={handleScroll}
@@ -1072,7 +1119,7 @@ export default function TripsPage() {
         </div>
       )}
 
-      {/* 5. 일자별 타임라인 일정 추가 / 수정 통합 모달 */}
+      {/* 5. 타임라인 일정 모달 */}
       {isPlanModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">

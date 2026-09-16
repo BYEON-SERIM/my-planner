@@ -28,7 +28,7 @@ export default function RootLayout({
           <Sidebar />
 
           {/* 메인 영역 */}
-          <main className="flex-1 min-w-0 transition-all pt-14 lg:pt-0">
+          <main className="flex-1 min-w-0 transition-all lg:pt-0">
             {/* 🌟 max-w-5xl 제거: 일반 PC/노트북 화면부터 기본 7xl(최대 1280px) 이상으로 시원하게 확장 */}
             <div className="w-full max-w-7xl 2xl:max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8">
               {children}

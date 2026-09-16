@@ -187,6 +187,12 @@ export default function DiariesPage() {
     e.preventDefault();
     if (!selectedTrip) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -242,6 +248,7 @@ export default function DiariesPage() {
             photo_paths: finalPaths,
             photo_url: finalUrls[0] || '',
             photo_path: finalPaths[0] || '',
+            user_id: user.id 
           },
         ]);
 

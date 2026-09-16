@@ -171,6 +171,12 @@ export default function CalendarPage() {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+    
     const { error } = await supabase.from('schedules').insert([
       {
         title: newTitle,
@@ -178,6 +184,7 @@ export default function CalendarPage() {
         end_date: endDate,
         category: newCategory,
         color: newColor,
+        user_id: user.id 
       },
     ]);
 

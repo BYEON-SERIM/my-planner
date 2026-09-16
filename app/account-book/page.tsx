@@ -120,6 +120,12 @@ export default function AccountBookPage() {
     e.preventDefault();
     if (!amount || isNaN(Number(amount))) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
     const payload = {
       type,
       amount: Number(amount),
@@ -127,6 +133,7 @@ export default function AccountBookPage() {
       description,
       date,
       payment_method: paymentMethod,
+      user_id: user.id 
     };
 
     let error;

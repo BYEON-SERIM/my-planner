@@ -170,6 +170,12 @@ export default function AttachmentsPage() {
     e.preventDefault();
     if (!selectedTrip) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -227,6 +233,7 @@ export default function AttachmentsPage() {
             category,
             booking_no: bookingNo,
             memo,
+            user_id: user.id 
           },
         ]);
 

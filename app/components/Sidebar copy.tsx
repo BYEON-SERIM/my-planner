@@ -1,70 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { User } from '@supabase/supabase-js';
-import {
+import { 
   Sparkles,
-  Calendar,
-  Map,
-  Receipt,
-  Paperclip,
+  Calendar, 
+  Map, 
+  Receipt, 
+  Paperclip, 
   BookOpen,
-  Menu,
+  Menu, 
   X,
   CheckSquare,
   Wallet,
   PanelLeftClose,
   PanelLeft,
   LayoutDashboard,
-  Image as ImageIcon,
-  LogOut,
-  LogIn
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const pathname = usePathname();
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setLoading(false);
-    };
-
-    checkUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleGoogleLogin = async () => {
-    const redirectUrl = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:3000/auth/callback'
-      : 'https://my-planner-lovat.vercel.app/auth/callback';
-
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-  };
-
-  const handleLogout = async () => {
-    if (!confirm('로그아웃 하시겠습니까?')) return;
-    await supabase.auth.signOut();
-  };
 
   const menuGroups = [
     {
@@ -90,9 +49,10 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* 모바일/패드 전용 상단 헤더 */}
+      {/* 모바일/패드 전용 상단 헤더 (화면 폭이 좁을 때 노출) */}
       <div className="lg:hidden flex items-center justify-between p-3.5 bg-white border-b border-slate-100 fixed top-0 left-0 right-0 z-40">
-        <div className="flex items-center gap-2">
+        {/* 1. 왼쪽: 햄버거 메뉴 버튼 + 반짝이는 아이콘 */}
+        <div className="flex items-center">
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
@@ -101,25 +61,26 @@ export default function Sidebar() {
             {isOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           
-          <Link
-            href="/"
-            onClick={() => setIsOpen(false)}
-            className="font-black text-base text-slate-800 hover:opacity-80 transition cursor-pointer tracking-tight"
-          >
-            SECO LOG
-          </Link>
+          <Link 
+          href="/" 
+          onClick={() => setIsOpen(false)}
+          className="font-black text-base text-slate-800 hover:opacity-80 transition cursor-pointer tracking-tight"
+        >
+          SECO LOG
+        </Link>
         </div>
+ 
       </div>
 
-      {/* 모바일 메뉴 오버레이 */}
+      {/* 모바일 메뉴 열림 시 배경 오버레이 */}
       {isOpen && (
-        <div
+        <div 
           onClick={() => setIsOpen(false)}
           className="lg:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40"
         />
       )}
 
-      {/* PC 및 고정/접이식 사이드바 */}
+      {/* PC 및 가로모드 전용 고정/접이식 사이드바 */}
       <aside
         className={`
           fixed top-0 left-0 z-50 h-screen bg-white border-r border-slate-100 flex flex-col justify-between p-4 transition-all duration-300 ease-in-out shrink-0
@@ -129,9 +90,9 @@ export default function Sidebar() {
         `}
       >
         <div className="space-y-6">
-          {/* 상단 로고 & 토글 버튼 */}
+          {/* 상단 로고 & PC 사이드바 토글(축소) 버튼 */}
           <div className="flex items-center justify-between px-1 py-1">
-            <Link
+            <Link 
               href="/"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-2.5 overflow-hidden group cursor-pointer"
@@ -146,6 +107,7 @@ export default function Sidebar() {
               )}
             </Link>
 
+            {/* PC 전용 축소 토글 버튼 */}
             <button
               type="button"
               onClick={() => setIsCollapsed(!isCollapsed)}
@@ -157,7 +119,7 @@ export default function Sidebar() {
           </div>
 
           {/* 메뉴 리스트 */}
-          <nav className="space-y-5 overflow-y-auto max-h-[calc(100vh-200px)] no-scrollbar">
+          <nav className="space-y-5 overflow-y-auto max-h-[calc(100vh-140px)] no-scrollbar">
             {menuGroups.map((group, groupIdx) => (
               <div key={group.groupName} className="space-y-1">
                 {!isCollapsed ? (
@@ -194,59 +156,13 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        {/* 🌟 한 줄 구성 하단 로그인/프로필 영역 */}
-        <div className="pt-3 border-t border-slate-100">
-          {loading ? (
-            <div className="py-2 text-center text-[10px] text-slate-400">확인 중...</div>
-          ) : user ? (
-            <div className={`flex items-center justify-between gap-2 px-1 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-              {/* 프로필 이미지 & 유저 정보 */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                {user.user_metadata?.avatar_url ? (
-                  <img
-                    src={user.user_metadata.avatar_url}
-                    alt="프로필"
-                    className="w-7 h-7 rounded-full border border-slate-200 shrink-0"
-                  />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-[10px] shrink-0">
-                    {user.email?.[0].toUpperCase()}
-                  </div>
-                )}
-                {!isCollapsed && (
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-800 truncate leading-tight">
-                      {user.user_metadata?.full_name || '사용자'}
-                    </p>
-                    <p className="text-[10px] text-slate-400 truncate leading-tight">{user.email}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* 로그아웃 버튼 */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0"
-                title="로그아웃"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
-                isCollapsed ? 'px-0' : ''
-              }`}
-              title="Google 로그인"
-            >
-              <LogIn size={15} />
-              {!isCollapsed && <span>Google 로그인</span>}
-            </button>
-          )}
-        </div>
+        {/* 하단 버전 정보 */}
+        {!isCollapsed && (
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 px-1">
+            <span className="font-semibold text-[11px]">SECO LOG v1.0</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500" title="온라인" />
+          </div>
+        )}
       </aside>
     </>
   );
