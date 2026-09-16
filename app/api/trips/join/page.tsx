@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Users, Loader2 } from 'lucide-react';
 
-export default function JoinTripPage() {
+// 🌟 Suspense 내부로 로직 분리
+function JoinTripContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
@@ -14,7 +15,6 @@ export default function JoinTripPage() {
 
   useEffect(() => {
     const processJoin = async () => {
-      // 1. 로그인 여부 체크
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
@@ -29,7 +29,6 @@ export default function JoinTripPage() {
         return;
       }
 
-      // 2. 멤버 참여 API 호출
       const res = await fetch('/api/trips/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +39,7 @@ export default function JoinTripPage() {
 
       if (res.ok) {
         setStatus('success');
-        setMsg('여행 프로젝트 멤버로 동가되었습니다! 해당 여행 페이지로 이동합니다.');
+        setMsg('여행 프로젝트 멤버로 등록되었습니다! 해당 여행 페이지로 이동합니다.');
         setTimeout(() => {
           router.push('/trips');
         }, 1500);
@@ -71,12 +70,21 @@ export default function JoinTripPage() {
         {status === 'error' && (
           <button
             onClick={() => router.push('/')}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold transition hover:bg-blue-700"
+            className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold transition hover:bg-blue-700 cursor-pointer"
           >
             홈으로 이동
           </button>
         )}
       </div>
     </div>
+  );
+}
+
+// 🌟 메인 Export 부분에서 Suspense 감싸기
+export default function JoinTripPage() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center text-xs text-slate-400">페이지 로딩 중...</div>}>
+      <JoinTripContent />
+    </Suspense>
   );
 }
