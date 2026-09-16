@@ -23,7 +23,9 @@ import {
   ChevronUp,
   Paperclip,
   ExternalLink,
-  Share2
+  Share2,
+  Users,
+  UserX
 } from 'lucide-react';
 
 interface Trip {
@@ -63,6 +65,12 @@ interface TripPlan {
   attachment?: AttachmentItem;
 }
 
+interface TripMember {
+  id: string;
+  user_id: string;
+  created_at: string;
+}
+
 export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -77,7 +85,11 @@ export default function TripsPage() {
   const sliderRef = useRef<HTMLDivElement>(null);
   const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // 모달 상태
+  // 🌟 동행자 목록 모달 상태
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [membersList, setMembersList] = useState<TripMember[]>([]);
+
+  // 여행 등록/수정 모달 상태
   const [isAddTripModalOpen, setIsAddTripModalOpen] = useState(false);
   const [isEditTripModalOpen, setIsEditTripModalOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -160,14 +172,13 @@ export default function TripsPage() {
     }
   }, [selectedTrip]);
 
-  // 🌟 동행자 초대를 위한 공유 링크 생성 핸들러
+  // 🌟 공유 링크 생성
   const handleShareTrip = async (trip: Trip, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
     try {
       let token = trip.share_token;
 
-      // 공유 토큰이 없는 경주 자동 생성 후 저장
       if (!token) {
         token = crypto.randomUUID();
         await supabase
@@ -183,9 +194,34 @@ export default function TripsPage() {
 
       const shareUrl = `${window.location.origin}/trips/join?token=${token}`;
       await navigator.clipboard.writeText(shareUrl);
-      alert('🌟 여행 초대를 위한 공유 링크가 복사되었습니다!\n이 링크로 접속 후 구글 로그인 시 동행자로 합류되어 데이터를 함께 조회/수정할 수 있습니다.');
+      alert('🌟 초대를 위한 공유 링크가 복사되었습니다!\n이 링크로 접속하여 구글 로그인 시 동행자로 함께 관리할 수 있습니다.');
     } catch (err) {
       alert('공유 링크 복사에 실패했습니다.');
+    }
+  };
+
+  // 🌟 동행자 목록 가져오기
+  const fetchMembers = async (tripId: string) => {
+    const res = await fetch(`/api/trips/members?tripId=${tripId}`);
+    const data = await res.json();
+    if (res.ok) {
+      setMembersList(data.members || []);
+    }
+  };
+
+  // 🌟 특정 동행자 내보내기 (공유 해제)
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('이 동행자의 공유 권한을 해제하시겠습니까?')) return;
+
+    const res = await fetch('/api/trips/members', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId }),
+    });
+
+    if (res.ok && selectedTrip) {
+      alert('공유가 해제되었습니다.');
+      fetchMembers(selectedTrip.id);
     }
   };
 
@@ -578,7 +614,6 @@ export default function TripsPage() {
                       </span>
                       
                       <div className="flex items-center gap-1">
-                        {/* 🌟 여행 카드 내 공유 버튼 */}
                         <button
                           onClick={(e) => handleShareTrip(trip, e)}
                           className="p-1 text-slate-400 hover:text-emerald-600 transition cursor-pointer"
@@ -630,15 +665,29 @@ export default function TripsPage() {
                     <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">📍 {selectedTrip.destination} | {selectedTrip.start_date} ~ {selectedTrip.end_date}</p>
                   </div>
 
-                  {/* 🌟 여행 상세 상단 공유 버튼 */}
-                  <button
-                    onClick={() => handleShareTrip(selectedTrip)}
-                    className="ml-2 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
-                    title="동행자 공유 링크 생성"
-                  >
-                    <Share2 size={14} />
-                    <span className="hidden sm:inline">공유</span>
-                  </button>
+                  {/* 🌟 버튼 영역: 동행자 관리 & 공유하기 */}
+                  <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        fetchMembers(selectedTrip.id);
+                        setIsMemberModalOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      title="동행자 멤버 조회 및 관리"
+                    >
+                      <Users size={14} />
+                      <span className="hidden sm:inline">동행자</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShareTrip(selectedTrip)}
+                      className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      title="동행자 초대 링크 복사"
+                    >
+                      <Share2 size={14} />
+                      <span className="hidden sm:inline">공유</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0 w-full xl:w-auto">
@@ -672,7 +721,6 @@ export default function TripsPage() {
               {/* 탭 1: Day 타임라인 */}
               {activeTab === 'timeline' && (
                 <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                  {/* Day 선택 탭 헤더 */}
                   <div 
                     className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
@@ -716,7 +764,6 @@ export default function TripsPage() {
                     </div>
                   </div>
 
-                  {/* 스와이프 슬라이더 */}
                   <div 
                     ref={sliderRef}
                     onScroll={handleScroll}
@@ -898,6 +945,55 @@ export default function TripsPage() {
           )}
         </div>
       </div>
+
+      {/* 🌟 👥 동행자 목록 & 공유 해제 관리 모달 */}
+      {isMemberModalOpen && selectedTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
+                <Users size={18} className="text-blue-600" /> 참여 중인 동행자
+              </h2>
+              <button onClick={() => setIsMemberModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {membersList.length === 0 ? (
+                <div className="py-8 text-center space-y-1">
+                  <UserX size={24} className="text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-400">아직 참여한 동행자가 없습니다.<br/>[공유] 버튼을 눌러 링크를 전달해보세요!</p>
+                </div>
+              ) : (
+                membersList.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs">
+                    <span className="font-bold text-slate-700 truncate max-w-[170px]" title={m.user_id}>
+                      {m.user_id}
+                    </span>
+
+                    <button
+                      onClick={() => handleRemoveMember(m.id)}
+                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-lg text-[11px] transition cursor-pointer shrink-0"
+                    >
+                      공유 해제
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end border-t border-slate-100">
+              <button
+                onClick={() => setIsMemberModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 text-xs font-bold text-slate-600 rounded-xl hover:bg-slate-200 cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. 새 여행 등록 모달 */}
       {isAddTripModalOpen && (
