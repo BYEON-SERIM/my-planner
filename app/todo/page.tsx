@@ -10,7 +10,11 @@ import {
   Tag, 
   Check, 
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertCircle,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface Schedule {
@@ -36,8 +40,9 @@ export default function TodoPage() {
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [category, setCategory] = useState('개인');
-  const [filterMode, setFilterMode] = useState<'all_week' | 'day'>('all_week');
+  const [filterMode, setFilterMode] = useState<'all_week' | 'day' | 'overdue'>('all_week');
   const [loading, setLoading] = useState(true);
+  const [isOverdueOpen, setIsOverdueOpen] = useState(true);
 
   const categories = ['개인', '업무'];
 
@@ -72,6 +77,7 @@ export default function TodoPage() {
   const weekDays = getWeekDays();
   const weekStartDate = weekDays[0].dateStr;
   const weekEndDate = weekDays[6].dateStr;
+  const todayStr = getTodayString();
 
   const fetchSchedules = async () => {
     setLoading(true);
@@ -128,6 +134,16 @@ export default function TodoPage() {
     if (!error) fetchSchedules();
   };
 
+  // 🌟 미완료 지연 일정을 '오늘' 날짜로 변경해주는 함수
+  const rescheduleToToday = async (id: string) => {
+    const { error } = await supabase
+      .from('schedules')
+      .update({ date: todayStr })
+      .eq('id', id);
+
+    if (!error) fetchSchedules();
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('이 할 일을 삭제하시겠습니까?')) return;
 
@@ -135,13 +151,19 @@ export default function TodoPage() {
     if (!error) fetchSchedules();
   };
 
+  // 🌟 오늘 이전 날짜이고 미완료된 항목 필터링
+  const overdueSchedules = schedules.filter(
+    (s) => s.date < todayStr && !s.is_completed
+  );
+
   const thisWeekSchedules = schedules.filter(
     (s) => s.date >= weekStartDate && s.date <= weekEndDate
   );
 
-  const displaySchedules = thisWeekSchedules.filter((s) => {
+  const displaySchedules = schedules.filter((s) => {
+    if (filterMode === 'overdue') return s.date < todayStr && !s.is_completed;
     if (filterMode === 'day') return s.date === selectedDate;
-    return true;
+    return s.date >= weekStartDate && s.date <= weekEndDate;
   });
 
   const totalCount = thisWeekSchedules.length;
@@ -150,7 +172,7 @@ export default function TodoPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full pb-8">
-      {/* 🌟 1. 주간 헤더 & 진행률 보정 */}
+      {/* 1. 주간 헤더 & 진행률 */}
       <div className="bg-white p-3.5 sm:p-6 rounded-2xl border border-slate-100 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 min-w-0">
@@ -195,19 +217,100 @@ export default function TodoPage() {
         </div>
       </div>
 
-      {/* 🌟 2. 주간 요일 캘린더 탭 (주간 전체보기 버튼 은은한 톤으로 교체) */}
+      {/* 🌟 지난 미완료 할 일 알림 카드 (Overdue Banner) */}
+      {overdueSchedules.length > 0 && (
+        <div className="bg-rose-50/80 border border-rose-200/80 p-3.5 sm:p-4 rounded-2xl shadow-2xs space-y-3">
+          <div 
+            onClick={() => setIsOverdueOpen(!isOverdueOpen)}
+            className="flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 shrink-0" />
+              <h2 className="text-xs sm:text-sm font-bold text-rose-900">
+                지난 미완료 할 일 <span className="text-rose-600 font-black">({overdueSchedules.length}개)</span>
+              </h2>
+            </div>
+            
+            <div className="flex items-center gap-1.5 text-xs text-rose-600 font-bold">
+              <span>{isOverdueOpen ? '접기' : '펼치기'}</span>
+              {isOverdueOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </div>
+          </div>
+
+          {isOverdueOpen && (
+            <ul className="space-y-2 pt-1 border-t border-rose-200/60">
+              {overdueSchedules.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between p-2.5 bg-white border border-rose-100 rounded-xl gap-2 shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <button
+                      onClick={() => toggleComplete(item.id, item.is_completed)}
+                      className="w-4 h-4 rounded border border-rose-300 hover:border-rose-500 bg-white flex items-center justify-center shrink-0"
+                    >
+                      {item.is_completed && <Check size={11} strokeWidth={3} className="text-rose-600" />}
+                    </button>
+                    <span className="text-xs sm:text-sm font-bold text-slate-800 truncate">{item.title}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] text-rose-500 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100">
+                      {item.date}
+                    </span>
+
+                    <button
+                      onClick={() => rescheduleToToday(item.id)}
+                      className="px-2 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 rounded-lg transition flex items-center gap-0.5 cursor-pointer"
+                      title="오늘 날짜로 변경"
+                    >
+                      <span>오늘로 미루기</span>
+                      <ArrowRight size={11} />
+                    </button>
+
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-1 text-slate-300 hover:text-red-500 rounded-lg cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* 2. 주간 요일 캘린더 탭 */}
       <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs">
         <div className="flex items-center justify-between mb-2 px-1">
-          <button
-            onClick={() => setFilterMode('all_week')}
-            className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer ${
-              filterMode === 'all_week'
-                ? 'bg-blue-50 text-blue-600 border border-blue-200/60 font-extrabold'
-                : 'text-slate-500 hover:bg-slate-50 border border-transparent'
-            }`}
-          >
-            📅 주간 전체 보기 ({thisWeekSchedules.length})
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setFilterMode('all_week')}
+              className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer ${
+                filterMode === 'all_week'
+                  ? 'bg-blue-50 text-blue-600 border border-blue-200/60 font-extrabold'
+                  : 'text-slate-500 hover:bg-slate-50 border border-transparent'
+              }`}
+            >
+              📅 주간 전체 보기 ({thisWeekSchedules.length})
+            </button>
+
+            {overdueSchedules.length > 0 && (
+              <button
+                onClick={() => setFilterMode('overdue')}
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer ${
+                  filterMode === 'overdue'
+                    ? 'bg-rose-50 text-rose-600 border border-rose-200/60 font-extrabold'
+                    : 'text-slate-500 hover:bg-slate-50 border border-transparent'
+                }`}
+              >
+                ⏰ 지난 미완료 ({overdueSchedules.length})
+              </button>
+            )}
+          </div>
+
           <span className="hidden sm:inline text-[11px] text-slate-400">날짜를 클릭하면 해당 일만 필터링됩니다.</span>
         </div>
 
@@ -248,7 +351,6 @@ export default function TodoPage() {
       
       {/* 3. 할 일 입력 폼 */}
       <form onSubmit={handleAddSchedule} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
-        {/* 텍스트 입력부 */}
         <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
           <Plus className="text-slate-400 w-5 h-5 shrink-0" />
           <input
@@ -260,10 +362,8 @@ export default function TodoPage() {
           />
         </div>
 
-        {/* 옵션 선택 & 추가 버튼 라인 */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            {/* 🌟 날짜 선택 (브라우저 기본 아이콘과 중복 제거 및 깔끔한 폰트 크기) */}
             <div className="flex items-center bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-xs text-slate-700 hover:bg-slate-100 transition">
               <input
                 type="date"
@@ -276,7 +376,6 @@ export default function TodoPage() {
               />
             </div>
 
-            {/* 🌟 카테고리 선택 */}
             <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-xl text-xs text-slate-700 hover:bg-slate-100 transition">
               <Tag size={13} className="text-slate-400 shrink-0" />
               <select
@@ -291,7 +390,6 @@ export default function TodoPage() {
             </div>
           </div>
 
-          {/* 🌟 추가하기 버튼 (우측 수평 정렬) */}
           <button
             type="submit"
             className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
@@ -345,7 +443,6 @@ export default function TodoPage() {
                   {item.date}
                 </span>
 
-                {/* 🌟 모바일 대응: 터치 화면에서는 삭제 아이콘이 항상 보이도록 투명도 조정 */}
                 <button
                   onClick={() => handleDelete(item.id)}
                   className="p-1 sm:p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"

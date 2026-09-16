@@ -17,7 +17,8 @@ import {
   CalendarDays,
   X,
   FileText,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 interface Trip {
@@ -67,6 +68,9 @@ export default function DashboardPage() {
   const [weeklyEvents, setWeeklyEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 🌟 모바일 전용 대시보드 탭 상태 ('todo' | 'schedule' | 'trip' | 'widgets')
+  const [mobileTab, setMobileTab] = useState<'todo' | 'schedule' | 'trip' | 'widgets'>('todo');
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const getTodayString = () => {
@@ -99,7 +103,6 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
 
-    // 1. schedules 불러오기
     const { data: scheduleData, error: schedError } = await supabase
       .from('schedules')
       .select('*')
@@ -114,7 +117,6 @@ export default function DashboardPage() {
 
     const weekRange = getThisWeekRange();
 
-    // 🌟 2. [수정됨] calendar_events 제거 ➔ schedules와 trips로 이번주 일정 집계
     const { data: weekSchedules } = await supabase
       .from('schedules')
       .select('id, title, date, category')
@@ -154,7 +156,6 @@ export default function DashboardPage() {
 
     setWeeklyEvents(combinedEvents);
 
-    // 3. 여행 정보 불러오기
     const { data: tripData } = await supabase
       .from('trips')
       .select('*')
@@ -232,7 +233,6 @@ export default function DashboardPage() {
     const end = new Date(endDateStr);
     end.setHours(0, 0, 0, 0);
 
-    // 1. 여행 중일 때: 상큼한 에메랄드 파스텔
     if (today >= start && today <= end) {
       const diffTime = Math.abs(today.getTime() - start.getTime());
       const currentDayNum = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
@@ -245,14 +245,12 @@ export default function DashboardPage() {
     const diffTime = start.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    // 2. 다가오는 여행(D-Day): 또렷하고 산뜻한 블루 소프트 뱃지
     if (diffDays > 0) {
       return { 
         text: `D-${diffDays}`, 
         badgeBg: 'bg-blue-50 text-blue-600 border border-blue-200/60' 
       };
     } else {
-      // 3. 지난 여행: 차분한 슬레이트 뱃지
       return { 
         text: `D+${Math.abs(diffDays)} (완료)`, 
         badgeBg: 'bg-slate-100 text-slate-500 border border-slate-200/60' 
@@ -261,8 +259,12 @@ export default function DashboardPage() {
   };
 
   const todayStr = getTodayString();
+
+  const overdueUncompleted = schedules.filter((s) => s.date < todayStr && !s.is_completed);
   const todaySchedules = schedules.filter((s) => s.date === todayStr);
-  const remainingTodayCount = todaySchedules.filter((s) => !s.is_completed).length;
+  const combinedTodaySchedules = [...overdueUncompleted, ...todaySchedules];
+
+  const remainingTaskCount = combinedTodaySchedules.filter((s) => !s.is_completed).length;
 
   const weekRange = getThisWeekRange();
   const thisWeekSchedules = schedules.filter(
@@ -286,13 +288,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full pb-8">
-      {/* 🌟 1. 모바일 반응형 보정: 상단 대시보드 퀵 서머리 바 */}
+      {/* 1. 상단 대시보드 퀵 서머리 바 */}
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4 divide-x divide-slate-100">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
             <span className="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">
-              오늘 할 일 <strong className="text-blue-600 font-extrabold">{remainingTodayCount}개</strong> 남음
+              챙길 할 일 <strong className="text-blue-600 font-extrabold">{remainingTaskCount}개</strong> 남음
+              {overdueUncompleted.length > 0 && (
+                <span className="text-[10px] text-rose-500 ml-1 font-bold">
+                  (지연 {overdueUncompleted.length})
+                </span>
+              )}
             </span>
           </div>
           <div className="pl-3 sm:pl-4 flex items-center gap-1.5">
@@ -311,10 +318,52 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* 2. 메인 영역: 오늘의 To Do & 금주 일정 */}
+      {/* 🌟 2. 모바일 전용 탭 컨트롤 바 (PC lg:에서는 숨김) */}
+      <div className="lg:hidden flex items-center bg-slate-100 p-1 rounded-xl shrink-0 gap-1">
+        <button
+          onClick={() => setMobileTab('todo')}
+          className={`flex-1 justify-center py-2 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+            mobileTab === 'todo' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500'
+          }`}
+        >
+          <CheckSquare size={13} /> 투두 ({remainingTaskCount})
+        </button>
+
+        <button
+          onClick={() => setMobileTab('schedule')}
+          className={`flex-1 justify-center py-2 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+            mobileTab === 'schedule' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-500'
+          }`}
+        >
+          <CalendarDays size={13} /> 주간 일정
+        </button>
+
+        <button
+          onClick={() => setMobileTab('trip')}
+          className={`flex-1 justify-center py-2 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+            mobileTab === 'trip' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-500'
+          }`}
+        >
+          ✈️ 여행
+        </button>
+
+        <button
+          onClick={() => setMobileTab('widgets')}
+          className={`flex-1 justify-center py-2 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer whitespace-nowrap ${
+            mobileTab === 'widgets' ? 'bg-white text-amber-600 shadow-xs' : 'text-slate-500'
+          }`}
+        >
+          <Wallet size={13} /> 경비/서류
+        </button>
+      </div>
+
+      {/* 3. 메인 콘텐츠 (PC는 그리드 유지, 모바일은 탭 선택에 따라 표시) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        
         {/* 오늘의 To Do */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6 flex flex-col justify-between space-y-4">
+        <div className={`lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6 flex flex-col justify-between space-y-4 ${
+          mobileTab === 'todo' ? 'block' : 'hidden lg:flex'
+        }`}>
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <CheckSquare className="w-5 h-5 text-blue-600 shrink-0" />
@@ -328,7 +377,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-2.5 overflow-y-auto flex-1 max-h-[260px]">
-            {todaySchedules.length === 0 ? (
+            {combinedTodaySchedules.length === 0 ? (
               <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl space-y-1">
                 <p className="text-xs font-semibold text-slate-500">오늘 예정된 할 일이 없습니다.</p>
                 <Link href="/todo" className="text-[11px] font-bold text-blue-600 hover:underline">
@@ -336,33 +385,50 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              todaySchedules.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 flex items-center justify-between transition hover:border-slate-200"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <button
-                      onClick={() => toggleComplete(item.id, item.is_completed)}
-                      className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
-                        item.is_completed
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'border-slate-300 hover:border-blue-500 bg-white'
-                      }`}
-                    >
-                      {item.is_completed && <Check size={13} strokeWidth={3} />}
-                    </button>
+              combinedTodaySchedules.map((item) => {
+                const isOverdue = item.date < todayStr && !item.is_completed;
 
-                    <span className={`text-xs sm:text-sm font-semibold truncate ${item.is_completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                      {item.title}
-                    </span>
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-3 rounded-xl border flex items-center justify-between transition ${
+                      isOverdue 
+                        ? 'bg-rose-50/60 border-rose-100' 
+                        : 'bg-slate-50/80 border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <button
+                        onClick={() => toggleComplete(item.id, item.is_completed)}
+                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
+                          item.is_completed
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : isOverdue
+                            ? 'border-rose-300 hover:border-rose-500 bg-white'
+                            : 'border-slate-300 hover:border-blue-500 bg-white'
+                        }`}
+                      >
+                        {item.is_completed && <Check size={13} strokeWidth={3} />}
+                      </button>
+
+                      <span className={`text-xs sm:text-sm font-semibold truncate ${item.is_completed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                        {item.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {isOverdue && (
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-md flex items-center gap-0.5">
+                          <AlertCircle size={10} /> 지연
+                        </span>
+                      )}
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-slate-200 text-blue-600 rounded-md">
+                        {item.category}
+                      </span>
+                    </div>
                   </div>
-
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-white border border-slate-200 text-blue-600 rounded-md shrink-0 ml-2">
-                    {item.category}
-                  </span>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -383,7 +449,9 @@ export default function DashboardPage() {
         </div>
 
         {/* 이번 주 스케줄 */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6 flex flex-col justify-between space-y-4">
+        <div className={`lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6 flex flex-col justify-between space-y-4 ${
+          mobileTab === 'schedule' ? 'block' : 'hidden lg:flex'
+        }`}>
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <CalendarDays className="w-5 h-5 text-indigo-600 shrink-0" />
@@ -434,7 +502,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 3. 부수적 섹션: 여행 프로젝트 요약 카드 */}
+      {/* 여행 프로젝트 요약 카드 */}
       {activeTrip && (
         (() => {
           const ddayInfo = calculateDDay(activeTrip.start_date, activeTrip.end_date);
@@ -442,7 +510,9 @@ export default function DashboardPage() {
 
           return (
             <div 
-              className="bg-white rounded-2xl border-2 p-4 sm:p-5 shadow-2xs space-y-3"
+              className={`bg-white rounded-2xl border-2 p-4 sm:p-5 shadow-2xs space-y-3 ${
+                mobileTab === 'trip' ? 'block' : 'hidden lg:block'
+              }`}
               style={{ borderColor: accentColor }}
             >
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
@@ -504,8 +574,10 @@ export default function DashboardPage() {
         })()
       )}
 
-      {/* 4. 하단 서브 위젯: 경비 & 서류 보관함 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+      {/* 경비 & 서류 보관함 위젯 */}
+      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 ${
+        mobileTab === 'widgets' ? 'block space-y-4 lg:space-y-0' : 'hidden lg:grid'
+      }`}>
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-100 shadow-xs p-4 sm:p-5 flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
             <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
@@ -578,7 +650,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 5. 1초 미리보기 팝업 모달 */}
+      {/* 5. 팝업 모달 */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">

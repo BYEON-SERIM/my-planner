@@ -74,7 +74,7 @@ export default function DiariesPage() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // 🌟 스와이프 슬라이더 및 상단 탭 Ref 추가
+  // 🌟 스와이프 슬라이더 및 상단 탭 Ref
   const sliderRef = useRef<HTMLDivElement>(null);
   const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -290,7 +290,7 @@ export default function DiariesPage() {
     return `${yyyy}.${mm}.${dd} (${dayName})`;
   };
 
-  // 🌟 스와이프 감지 함수: 1단계씩 이동하며 상단 버튼 자동 스크롤
+  // 🌟 스와이프 감지 및 상단 버튼 동기화
   const handleScroll = () => {
     if (!sliderRef.current) return;
     const { scrollLeft, clientWidth } = sliderRef.current;
@@ -309,22 +309,29 @@ export default function DiariesPage() {
     }
   };
 
+  // 🌟 음수 좌표 계산 에러 완벽 해결 (dayNum === 0 일 때 스크롤 0px 처리)
   const scrollToDay = (dayNum: number) => {
     setSelectedDayFilter(dayNum);
+
     if (sliderRef.current) {
       const cardWidth = sliderRef.current.clientWidth;
-      const targetIndex = dayNum === 0 ? 0 : dayNum - 1;
+      const targetLeft = dayNum === 0 ? 0 : (dayNum - 1) * cardWidth;
+
       sliderRef.current.scrollTo({
-        left: targetIndex * cardWidth,
+        left: targetLeft,
         behavior: 'smooth',
       });
     }
-    dayTabRefs.current[dayNum]?.scrollIntoView({
+
+    const refIdx = dayNum === 0 ? 0 : dayNum;
+    dayTabRefs.current[refIdx]?.scrollIntoView({
       behavior: 'smooth',
       block: 'nearest',
       inline: 'center',
     });
   };
+
+  const themeColor = selectedTrip?.color || '#3b82f6';
 
   return (
     <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
@@ -344,7 +351,7 @@ export default function DiariesPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        {/* 좌측 여행 선택 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
           <div 
             onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
@@ -430,20 +437,21 @@ export default function DiariesPage() {
                 </span>
               </div>
 
-              {/* Day 필터 버튼 칩 바 (가로 스크롤바 숨김) */}
+              {/* Day 필터 버튼 칩 바 */}
               <div 
                 className="flex items-center gap-1.5 overflow-x-auto py-1 shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 <button
                   ref={(el) => { dayTabRefs.current[0] = el; }}
-                  onClick={() => scrollToDay(1)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
+                  onClick={() => scrollToDay(0)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer whitespace-nowrap shrink-0 border ${
                     selectedDayFilter === 0
-                      ? 'text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      ? 'text-white font-extrabold shadow-2xs'
+                      : 'bg-white text-slate-700 font-bold border-slate-200/80 hover:bg-slate-50'
                   }`}
                   style={{
-                    backgroundColor: selectedDayFilter === 0 ? (selectedTrip.color || '#3b82f6') : undefined,
+                    backgroundColor: selectedDayFilter === 0 ? themeColor : undefined,
+                    borderColor: selectedDayFilter === 0 ? themeColor : undefined,
                   }}
                 >
                   전체 슬라이드 보기
@@ -459,16 +467,17 @@ export default function DiariesPage() {
                       key={dayNum}
                       ref={(el) => { dayTabRefs.current[dayNum] = el; }}
                       onClick={() => scrollToDay(dayNum)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0 ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0 border ${
                         isSelectedDay
-                          ? 'text-white shadow-xs'
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          ? 'text-white font-extrabold shadow-2xs'
+                          : 'bg-white text-slate-700 font-bold border-slate-200/80 hover:bg-slate-50'
                       }`}
                       style={{
-                        backgroundColor: isSelectedDay ? (selectedTrip.color || '#3b82f6') : undefined,
+                        backgroundColor: isSelectedDay ? themeColor : undefined,
+                        borderColor: isSelectedDay ? themeColor : undefined,
                       }}
                     >
-                      Day {dayNum}
+                      <span>Day {dayNum}</span>
                       {hasDiary && (
                         <span className={`w-1.5 h-1.5 rounded-full ${isSelectedDay ? 'bg-white' : 'bg-pink-500'}`} />
                       )}
@@ -477,7 +486,7 @@ export default function DiariesPage() {
                 })}
               </div>
 
-              {/* 🌟 Day별 포토 포스팅 가로 스와이프 슬라이더 */}
+              {/* Day별 포토 포스팅 가로 스와이프 슬라이더 */}
               <div 
                 ref={sliderRef}
                 onScroll={handleScroll}
