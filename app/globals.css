@@ -42,3 +42,15 @@ body {
     font-size: 16px !important; /* 16px 이상이어야 자동 줌인이 발동하지 않음 */
   }
 }
+
+@layer utilities {
+  /* 활성화된 Day 탭 스타일 (깔끔한 소프트 블루) */
+  .btn-day-active {
+    @apply bg-blue-50 text-blue-600 font-extrabold border-1 border-blue-500 shadow-2xs;
+  }
+
+  /* 비활성화된 Day 탭 스타일 */
+  .btn-day-inactive {
+    @apply bg-white text-slate-600 font-bold border border-slate-200/80 hover:bg-slate-50;
+  }
+}

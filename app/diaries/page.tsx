@@ -15,7 +15,9 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Trip {
@@ -47,7 +49,7 @@ export default function DiariesPage() {
   // 모바일 여행 리스트 토글 상태
   const [isMobileTripListOpen, setIsMobileTripListOpen] = useState(false);
 
-  // Day 필터 상태 (0 = 전체 보기, 1 = Day 1, 2 = Day 2 ...)
+  // Day 필터 상태 (0 = 전체 스와이프 보기, 1 = Day 1, 2 = Day 2 ...)
   const [selectedDayFilter, setSelectedDayFilter] = useState<number>(0);
 
   // 펼쳐진 Day 카드의 ID 목록
@@ -71,6 +73,10 @@ export default function DiariesPage() {
   const [newPreviews, setNewPreviews] = useState<string[]>([]);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // 🌟 스와이프 슬라이더 및 상단 탭 Ref 추가
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const fetchTrips = async () => {
     setLoading(true);
@@ -270,10 +276,6 @@ export default function DiariesPage() {
 
   const totalDays = selectedTrip ? getTimelineDays(selectedTrip.start_date, selectedTrip.end_date) : 0;
 
-  const displayedDays = selectedDayFilter === 0
-    ? Array.from({ length: totalDays }).map((_, i) => i + 1)
-    : [selectedDayFilter];
-
   const getTargetDayDate = (startDateStr: string, dayIndex: number) => {
     if (!startDateStr) return '';
     const date = new Date(startDateStr);
@@ -288,6 +290,42 @@ export default function DiariesPage() {
     return `${yyyy}.${mm}.${dd} (${dayName})`;
   };
 
+  // 🌟 스와이프 감지 함수: 1단계씩 이동하며 상단 버튼 자동 스크롤
+  const handleScroll = () => {
+    if (!sliderRef.current) return;
+    const { scrollLeft, clientWidth } = sliderRef.current;
+    if (clientWidth <= 0) return;
+
+    const currentDay = Math.floor((scrollLeft + clientWidth / 2) / clientWidth) + 1;
+    const validDay = Math.max(1, Math.min(totalDays, currentDay));
+
+    if (validDay !== selectedDayFilter) {
+      setSelectedDayFilter(validDay);
+      dayTabRefs.current[validDay]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  };
+
+  const scrollToDay = (dayNum: number) => {
+    setSelectedDayFilter(dayNum);
+    if (sliderRef.current) {
+      const cardWidth = sliderRef.current.clientWidth;
+      const targetIndex = dayNum === 0 ? 0 : dayNum - 1;
+      sliderRef.current.scrollTo({
+        left: targetIndex * cardWidth,
+        behavior: 'smooth',
+      });
+    }
+    dayTabRefs.current[dayNum]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+  };
+
   return (
     <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
       {/* 1. 상단 타이틀 바 */}
@@ -298,7 +336,7 @@ export default function DiariesPage() {
             <span>여행 포토 에세이 & 블로그</span>
           </h1>
           <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-1">
-            상단 Day 탭을 눌러 원하는 날짜의 일기를 펼쳐서 확인해 보세요.
+            상단 Day 탭을 누르거나 좌우로 스와이프하여 날짜별 일기를 확인해 보세요.
           </p>
         </div>
       </div>
@@ -306,10 +344,8 @@ export default function DiariesPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        {/* 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
-          
-          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 헤더 유지) */}
           <div 
             onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
             className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
@@ -333,7 +369,6 @@ export default function DiariesPage() {
             </div>
           </div>
 
-          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
           <div className={`space-y-2 overflow-y-auto flex-1 pr-1 transition-all ${
             isMobileTripListOpen ? 'mt-3 max-h-[220px] block' : 'hidden lg:block'
           }`}>
@@ -354,7 +389,7 @@ export default function DiariesPage() {
                     key={trip.id}
                     onClick={() => {
                       setSelectedTrip(trip);
-                      setIsMobileTripListOpen(false); // 모바일에서 선택 후 자동 닫기
+                      setIsMobileTripListOpen(false);
                     }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
@@ -395,14 +430,14 @@ export default function DiariesPage() {
                 </span>
               </div>
 
-              {/* Day 필터 버튼 칩 바 */}
+              {/* Day 필터 버튼 칩 바 (가로 스크롤바 숨김) */}
               <div 
-                className="flex items-center gap-1.5 overflow-x-auto py-1 shrink-0 no-scrollbar"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                className="flex items-center gap-1.5 overflow-x-auto py-1 shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 <button
-                  onClick={() => setSelectedDayFilter(0)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                  ref={(el) => { dayTabRefs.current[0] = el; }}
+                  onClick={() => scrollToDay(1)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
                     selectedDayFilter === 0
                       ? 'text-white shadow-xs'
                       : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -411,7 +446,7 @@ export default function DiariesPage() {
                     backgroundColor: selectedDayFilter === 0 ? (selectedTrip.color || '#3b82f6') : undefined,
                   }}
                 >
-                  전체 일기 보기
+                  전체 슬라이드 보기
                 </button>
 
                 {Array.from({ length: totalDays }).map((_, idx) => {
@@ -422,8 +457,9 @@ export default function DiariesPage() {
                   return (
                     <button
                       key={dayNum}
-                      onClick={() => setSelectedDayFilter(dayNum)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                      ref={(el) => { dayTabRefs.current[dayNum] = el; }}
+                      onClick={() => scrollToDay(dayNum)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0 ${
                         isSelectedDay
                           ? 'text-white shadow-xs'
                           : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -441,9 +477,14 @@ export default function DiariesPage() {
                 })}
               </div>
 
-              {/* Day별 포토 포스팅 리스트 */}
-              <div className="space-y-3.5 overflow-y-auto flex-1 pr-1 min-h-0">
-                {displayedDays.map((dayNum) => {
+              {/* 🌟 Day별 포토 포스팅 가로 스와이프 슬라이더 */}
+              <div 
+                ref={sliderRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-x-auto flex snap-x snap-mandatory snap-always scroll-smooth min-h-0 divide-x divide-transparent [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {Array.from({ length: totalDays }).map((_, idx) => {
+                  const dayNum = idx + 1;
                   const diary = diaries.find((d) => d.day_num === dayNum);
                   const isExpanded = diary ? expandedDiaryIds.includes(diary.id) : true;
                   const targetDateText = getTargetDayDate(selectedTrip.start_date, dayNum);
@@ -451,9 +492,9 @@ export default function DiariesPage() {
                   return (
                     <div 
                       key={dayNum}
-                      className="p-3.5 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 transition hover:border-slate-300"
+                      className="w-full shrink-0 snap-center p-3.5 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-2xl space-y-3 transition hover:border-slate-300 flex flex-col overflow-y-auto"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 shrink-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span 
                             className="text-xs font-black text-white px-2 py-0.5 rounded-md shadow-2xs shrink-0"
@@ -514,58 +555,60 @@ export default function DiariesPage() {
                         </div>
                       </div>
 
-                      {/* 작성된 본문 (접기/펼치기 제어) */}
-                      {diary ? (
-                        isExpanded ? (
-                          <div className="space-y-3 pt-1">
-                            <p className="text-[11px] sm:text-xs font-bold text-slate-400 flex items-center gap-1">
-                              <Calendar size={12} /> {targetDateText}
-                            </p>
-
-                            {/* 갤러리 이미지 */}
-                            {diary.photo_urls && diary.photo_urls.length > 0 && (
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {diary.photo_urls.map((url, i) => (
-                                  <div key={i} className="aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-2xs bg-slate-100">
-                                    <img 
-                                      src={url} 
-                                      alt={`Day ${dayNum} 사진 ${i + 1}`} 
-                                      className="w-full h-full object-cover hover:scale-105 transition duration-300 cursor-pointer"
-                                      onClick={() => window.open(url, '_blank')}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* 긴 글 본문 */}
-                            <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
-                              <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                                {diary.content || '작성된 본문 글이 없습니다.'}
+                      {/* 작성된 본문 영역 */}
+                      <div className="flex-1 overflow-y-auto">
+                        {diary ? (
+                          isExpanded ? (
+                            <div className="space-y-3 pt-1">
+                              <p className="text-[11px] sm:text-xs font-bold text-slate-400 flex items-center gap-1">
+                                <Calendar size={12} /> {targetDateText}
                               </p>
+
+                              {/* 갤러리 이미지 */}
+                              {diary.photo_urls && diary.photo_urls.length > 0 && (
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {diary.photo_urls.map((url, i) => (
+                                    <div key={i} className="aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-2xs bg-slate-100">
+                                      <img 
+                                        src={url} 
+                                        alt={`Day ${dayNum} 사진 ${i + 1}`} 
+                                        className="w-full h-full object-cover hover:scale-105 transition duration-300 cursor-pointer"
+                                        onClick={() => window.open(url, '_blank')}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* 긴 글 본문 */}
+                              <div className="bg-white p-3.5 sm:p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+                                <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                                  {diary.content || '작성된 본문 글이 없습니다.'}
+                                </p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div 
+                              onClick={() => toggleExpand(diary.id)}
+                              className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 text-xs text-slate-500 cursor-pointer hover:border-slate-300 transition"
+                            >
+                              <p className="truncate pr-2">{diary.content || '내용 접힘'}</p>
+                              <span className="text-[11px] font-bold text-blue-600 whitespace-nowrap">더보기 ∨</span>
+                            </div>
+                          )
                         ) : (
                           <div 
-                            onClick={() => toggleExpand(diary.id)}
-                            className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 text-xs text-slate-500 cursor-pointer hover:border-slate-300 transition"
+                            onClick={() => handleOpenModalForDay(dayNum)}
+                            className="py-12 text-center border border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-white transition space-y-1.5"
                           >
-                            <p className="truncate pr-2">{diary.content || '내용 접힘'}</p>
-                            <span className="text-[11px] font-bold text-blue-600 whitespace-nowrap">더보기 ∨</span>
+                            <ImageIcon className="w-6 h-6 text-slate-300 mx-auto" />
+                            <p className="text-xs font-bold text-slate-700">
+                              Day {dayNum} · {targetDateText}
+                            </p>
+                            <p className="text-[11px] text-slate-400">클릭하여 사진과 오늘의 추억을 기재해 보세요.</p>
                           </div>
-                        )
-                      ) : (
-                        <div 
-                          onClick={() => handleOpenModalForDay(dayNum)}
-                          className="py-6 sm:py-8 text-center border border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-white transition space-y-1"
-                        >
-                          <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-300 mx-auto" />
-                          <p className="text-xs font-bold text-slate-700">
-                            Day {dayNum} · {targetDateText}
-                          </p>
-                          <p className="text-[11px] text-slate-400">클릭하여 사진과 오늘의 추억을 기재해 보세요.</p>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}

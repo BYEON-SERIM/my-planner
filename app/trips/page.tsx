@@ -399,20 +399,16 @@ export default function TripsPage() {
     return days;
   };
 
-  // 🌟 오차 보정된 스와이프 감지 함수 (1단계씩 정확히 연동)
+  // 🌟 스와이프 시 상단 Day 탭을 실시간 동기화 및 자동으로 화면 중앙 스크롤 이동
   const handleScroll = () => {
     if (!sliderRef.current) return;
     const { scrollLeft, clientWidth } = sliderRef.current;
-    if (clientWidth <= 0) return;
+    if (clientWidth === 0) return;
     
-    // 카드 중간 지점 기준 1단계씩 계산
-    const currentDay = Math.floor((scrollLeft + clientWidth / 2) / clientWidth) + 1;
-    const total = selectedTrip ? getTimelineDays(selectedTrip.start_date, selectedTrip.end_date).length : 1;
-    const validDay = Math.max(1, Math.min(total, currentDay));
-
-    if (validDay !== activeDayNum) {
-      setActiveDayNum(validDay);
-      dayTabRefs.current[validDay - 1]?.scrollIntoView({
+    const currentDay = Math.round(scrollLeft / clientWidth) + 1;
+    if (currentDay !== activeDayNum) {
+      setActiveDayNum(currentDay);
+      dayTabRefs.current[currentDay - 1]?.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
         inline: 'center',
@@ -654,7 +650,7 @@ export default function TripsPage() {
                       ))}
                     </div>
 
-                    {/* PC 전용 화살표 */}
+                    {/* PC 전용 화살표 (모바일 hidden) */}
                     <div className="hidden lg:flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => scrollToDay(Math.max(1, activeDayNum - 1))}
@@ -673,7 +669,7 @@ export default function TripsPage() {
                     </div>
                   </div>
 
-                  {/* 스와이프 슬라이더 (가로 스크롤바 완전 숨김 + onScroll 연동) */}
+                  {/* 스와이프 슬라이더 (가로 스크롤바 완전 숨김 + onScroll 자동연동) */}
                   <div 
                     ref={sliderRef}
                     onScroll={handleScroll}

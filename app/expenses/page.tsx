@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   TrendingUp, 
@@ -19,7 +19,8 @@ import {
   PieChart,
   List,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Calendar
 } from 'lucide-react';
 
 interface Trip {
@@ -57,6 +58,9 @@ export default function ExpensesPage() {
   // 모바일 전용 뷰 탭 상태 ('list' | 'summary')
   const [mobileViewTab, setMobileViewTab] = useState<'list' | 'summary'>('list');
 
+  // 일자별(Day) 필터 상태 ('all' | number)
+  const [selectedDayFilter, setSelectedDayFilter] = useState<number | 'all'>('all');
+
   // 실시간 환율 상태
   const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [rateLoading, setRateLoading] = useState<boolean>(false);
@@ -73,6 +77,10 @@ export default function ExpensesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'현금' | '카드'>('현금');
   const [amount, setAmount] = useState<string>('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 스와이프 슬라이더 및 상단 Day 탭 Ref
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // 카테고리 설정
   const categories = [
@@ -153,6 +161,7 @@ export default function ExpensesPage() {
       setExchangedAmount(selectedTrip.exchanged_amount || 0);
       setCurrencyUnit(selectedTrip.currency_unit || '엔');
       fetchExchangeRate(selectedTrip.currency_unit || '엔');
+      setSelectedDayFilter('all');
     }
   }, [selectedTrip]);
 
@@ -216,7 +225,76 @@ export default function ExpensesPage() {
     }
   };
 
-  // 통계 계산
+  const getTripDays = (startStr: string, endStr: string) => {
+    if (!startStr || !endStr) return [];
+    const days = [];
+    const current = new Date(startStr);
+    const end = new Date(endStr);
+    let dayNum = 1;
+
+    while (current <= end) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+
+      days.push({
+        dayNum,
+        dateStr: `${yyyy}-${mm}-${dd}`,
+        displayDate: `${current.getMonth() + 1}/${current.getDate()}`,
+      });
+      current.setDate(current.getDate() + 1);
+      dayNum++;
+    }
+    return days;
+  };
+
+  const tripDays = selectedTrip ? getTripDays(selectedTrip.start_date, selectedTrip.end_date) : [];
+
+  // 스와이프 감지 함수: 1단계씩 넘어가며 상단 Day 탭을 동기화
+  const handleScroll = () => {
+    if (!sliderRef.current || selectedDayFilter === 'all') return;
+    const { scrollLeft, clientWidth } = sliderRef.current;
+    if (clientWidth <= 0) return;
+
+    const currentDay = Math.floor((scrollLeft + clientWidth / 2) / clientWidth) + 1;
+    const validDay = Math.max(1, Math.min(tripDays.length, currentDay));
+
+    if (validDay !== selectedDayFilter) {
+      setSelectedDayFilter(validDay);
+      dayTabRefs.current[validDay]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  };
+
+  const scrollToDay = (dayNum: number | 'all') => {
+    setSelectedDayFilter(dayNum);
+    if (sliderRef.current && dayNum !== 'all') {
+      const cardWidth = sliderRef.current.clientWidth;
+      sliderRef.current.scrollTo({
+        left: (dayNum - 1) * cardWidth,
+        behavior: 'smooth',
+      });
+    }
+    const refIdx = dayNum === 'all' ? 0 : dayNum;
+    dayTabRefs.current[refIdx]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+  };
+
+  // 선택된 Day 필터에 따른 지출 내역 가공
+  const filteredExpenses = expenses.filter((item) => {
+    if (selectedDayFilter === 'all') return true;
+    const targetDayObj = tripDays.find((d) => d.dayNum === selectedDayFilter);
+    return targetDayObj ? item.expense_date === targetDayObj.dateStr : true;
+  });
+
+  const filteredTotalSpent = filteredExpenses.reduce((sum, item) => sum + (item.amount || item.amount_krw || 0), 0);
+
   const totalSpent = expenses.reduce((sum, item) => sum + (item.amount || item.amount_krw || 0), 0);
   const totalSpentCash = expenses
     .filter((e) => (e.payment_method || '현금') === '현금')
@@ -228,6 +306,9 @@ export default function ExpensesPage() {
   const totalExchanged = selectedTrip?.exchanged_amount || 0;
   const remainingCash = totalExchanged - totalSpentCash;
   const usagePercent = totalExchanged > 0 ? Math.min(Math.round((totalSpentCash / totalExchanged) * 100), 100) : 0;
+
+  // 🌟 프로젝트 고유 설정 테마 색상 (기본값 블루)
+  const themeColor = selectedTrip?.color || '#3b82f6';
 
   return (
     <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
@@ -281,10 +362,8 @@ export default function ExpensesPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        {/* 좌측 여행 선택 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
-          
-          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 표시) */}
           <div 
             onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
             className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
@@ -308,7 +387,6 @@ export default function ExpensesPage() {
             </div>
           </div>
 
-          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
           <div className={`space-y-2 overflow-y-auto flex-1 pr-1 transition-all ${
             isMobileTripListOpen ? 'mt-3 max-h-[200px] block' : 'hidden lg:block'
           }`}>
@@ -326,7 +404,7 @@ export default function ExpensesPage() {
                     key={trip.id}
                     onClick={() => {
                       setSelectedTrip(trip);
-                      setIsMobileTripListOpen(false); // 모바일에서 선택 후 닫기
+                      setIsMobileTripListOpen(false);
                     }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
@@ -378,7 +456,7 @@ export default function ExpensesPage() {
                 </button>
               </div>
 
-              {/* 모바일 전용 상단 미니 잔액 바 (지출 항목 탭일 때 노출) */}
+              {/* 모바일 전용 상단 미니 잔액 바 */}
               {mobileViewTab === 'list' && (
                 <div className="lg:hidden bg-amber-50/90 border border-amber-200/80 p-2.5 rounded-xl flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
@@ -401,7 +479,6 @@ export default function ExpensesPage() {
               {/* 요약 정보 섹션 */}
               <div className={`space-y-3.5 sm:space-y-4 ${mobileViewTab === 'summary' ? 'block' : 'hidden lg:block'}`}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* 1. 현금 잔액 게이지 카드 */}
                   <div className="p-3.5 sm:p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-600">
                       <span className="flex items-center gap-1.5"><Coins size={15} className="text-amber-500" /> 남은 환전 잔액 (현금)</span>
@@ -430,7 +507,6 @@ export default function ExpensesPage() {
                     </div>
                   </div>
 
-                  {/* 2. 카드 승인 및 전체 지출 요약 카드 */}
                   <div className="p-3.5 sm:p-4 bg-blue-50/40 border border-blue-100 rounded-2xl space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-blue-900">
                       <span className="flex items-center gap-1.5"><CreditCard size={15} className="text-blue-600" /> 총 지출 내역</span>
@@ -451,7 +527,6 @@ export default function ExpensesPage() {
                   </div>
                 </div>
 
-                {/* 카테고리별 사용금액 카드 */}
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 mb-1.5">카테고리별 지출 요약</h3>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
@@ -478,64 +553,213 @@ export default function ExpensesPage() {
               </div>
 
               {/* 상세 지출 목록 섹션 */}
-              <div className={`flex-1 flex flex-col min-h-0 space-y-2 ${mobileViewTab === 'list' ? 'block' : 'hidden lg:block'}`}>
+              <div className={`flex-1 flex flex-col min-h-0 space-y-2.5 ${mobileViewTab === 'list' ? 'block' : 'hidden lg:block'}`}>
+                
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2 shrink-0">
                   <h3 className="text-xs sm:text-sm font-bold text-slate-800">지출 세부 항목</h3>
                 </div>
 
-                <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0 max-h-[420px] lg:max-h-none">
-                  {expenses.length === 0 ? (
-                    <div className="py-10 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
-                      <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-40" />
-                      <p className="text-xs font-semibold text-slate-500">등록된 지출 내역이 없습니다.</p>
-                    </div>
-                  ) : (
-                    expenses.map((item) => {
-                      const isCard = item.payment_method === '카드';
+                {/* 🌟 선택된 여행 프로젝트 고유의 테마 색상(themeColor) 연동 */}
+                {tripDays.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    <button
+                      type="button"
+                      ref={(el) => { dayTabRefs.current[0] = el; }}
+                      onClick={() => scrollToDay('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs transition cursor-pointer whitespace-nowrap shrink-0 border ${
+                        selectedDayFilter === 'all'
+                          ? 'text-white font-extrabold shadow-2xs'
+                          : 'bg-white text-slate-700 font-bold border-slate-200/80 hover:bg-slate-50'
+                      }`}
+                      style={{
+                        backgroundColor: selectedDayFilter === 'all' ? themeColor : undefined,
+                        borderColor: selectedDayFilter === 'all' ? themeColor : undefined,
+                      }}
+                    >
+                      전체 목록 ({expenses.length})
+                    </button>
+
+                    {tripDays.map((d) => {
+                      const dayExpensesCount = expenses.filter((e) => e.expense_date === d.dateStr).length;
+                      const isSelected = selectedDayFilter === d.dayNum;
 
                       return (
-                        <div
-                          key={item.id}
-                          className="p-2.5 sm:p-3 bg-slate-50/70 hover:bg-white border border-slate-100 hover:border-slate-200 rounded-xl shadow-2xs flex items-center justify-between gap-2.5 transition group"
+                        <button
+                          key={d.dayNum}
+                          type="button"
+                          ref={(el) => { dayTabRefs.current[d.dayNum] = el; }}
+                          onClick={() => scrollToDay(d.dayNum)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 border ${
+                            isSelected
+                              ? 'text-white font-extrabold shadow-2xs'
+                              : 'bg-white text-slate-700 font-bold border-slate-200/80 hover:bg-slate-50'
+                          }`}
+                          style={{
+                            backgroundColor: isSelected ? themeColor : undefined,
+                            borderColor: isSelected ? themeColor : undefined,
+                          }}
                         >
-                          <div className="space-y-1 min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
-                                {item.category}
-                              </span>
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                isCard ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-900'
-                              }`}>
-                                {isCard ? '💳 카드' : '💵 현금'}
-                              </span>
-                              <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">{item.expense_date}</span>
-                            </div>
-                            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{item.title}</p>
-                          </div>
+                          <span>Day {d.dayNum}</span>
+                          {dayExpensesCount > 0 && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                                isSelected ? 'bg-white text-slate-900' : 'bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {dayExpensesCount}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                          <div className="text-right shrink-0">
-                            <p className="text-xs sm:text-sm font-black text-slate-900">
-                              -{(item.amount || item.amount_krw || 0).toLocaleString()} {selectedTrip.currency_unit}
-                            </p>
-                            {exchangeRate > 0 && (
-                              <p className="text-[10px] text-slate-400 font-semibold">
-                                (약 ₩{Math.round((item.amount || 0) * exchangeRate).toLocaleString()}원)
+                {/* 선택된 탭 기준 총 지출 금액 요약 바 */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center justify-between shrink-0">
+                  <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <Calendar size={13} className="text-blue-500" />
+                    {selectedDayFilter === 'all' ? '전체 지출 합계' : `Day ${selectedDayFilter} 지출 합계`}
+                  </span>
+                  <div className="text-right">
+                    <span className="text-xs sm:text-sm font-black text-slate-900">
+                      {filteredTotalSpent.toLocaleString()} {selectedTrip.currency_unit || '엔'}
+                    </span>
+                    {exchangeRate > 0 && (
+                      <span className="text-[10px] text-slate-400 font-semibold ml-1">
+                        (약 ₩{Math.round(filteredTotalSpent * exchangeRate).toLocaleString()}원)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 날짜별 스와이프 슬라이더 (Day 모드 / 전체 목록 수용) */}
+                {selectedDayFilter === 'all' ? (
+                  <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0 max-h-[380px] lg:max-h-none">
+                    {expenses.length === 0 ? (
+                      <div className="py-10 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
+                        <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-40" />
+                        <p className="text-xs font-semibold text-slate-500">등록된 지출 내역이 없습니다.</p>
+                      </div>
+                    ) : (
+                      expenses.map((item) => {
+                        const isCard = item.payment_method === '카드';
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-2.5 sm:p-3 bg-slate-50/70 hover:bg-white border border-slate-100 hover:border-slate-200 rounded-xl shadow-2xs flex items-center justify-between gap-2.5 transition group"
+                          >
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                                  {item.category}
+                                </span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  isCard ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-900'
+                                }`}>
+                                  {isCard ? '💳 카드' : '💵 현금'}
+                                </span>
+                                <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">{item.expense_date}</span>
+                              </div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{item.title}</p>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <p className="text-xs sm:text-sm font-black text-slate-900">
+                                -{(item.amount || item.amount_krw || 0).toLocaleString()} {selectedTrip.currency_unit}
                               </p>
+                              {exchangeRate > 0 && (
+                                <p className="text-[10px] text-slate-400 font-semibold">
+                                  (약 ₩{Math.round((item.amount || 0) * exchangeRate).toLocaleString()}원)
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => handleDeleteExpense(item.id)}
+                              className="p-1 text-slate-300 hover:text-red-500 transition cursor-pointer shrink-0"
+                              title="삭제"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div 
+                    ref={sliderRef}
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-x-auto flex snap-x snap-mandatory snap-always scroll-smooth min-h-0 divide-x divide-transparent [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {tripDays.map((d) => {
+                      const dayExpenses = expenses.filter((e) => e.expense_date === d.dateStr);
+
+                      return (
+                        <div 
+                          key={d.dayNum}
+                          className="w-full shrink-0 snap-center p-1 rounded-2xl space-y-2 flex flex-col overflow-y-auto min-h-0"
+                        >
+                          <div className="space-y-2 overflow-y-auto flex-1 pr-1 min-h-0">
+                            {dayExpenses.length === 0 ? (
+                              <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
+                                <Sparkles className="w-5 h-5 text-blue-400 mx-auto opacity-40" />
+                                <p className="text-xs font-semibold text-slate-500">Day {d.dayNum} ({d.displayDate}) 지출 내역이 없습니다.</p>
+                              </div>
+                            ) : (
+                              dayExpenses.map((item) => {
+                                const isCard = item.payment_method === '카드';
+
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className="p-2.5 sm:p-3 bg-slate-50/70 hover:bg-white border border-slate-100 hover:border-slate-200 rounded-xl shadow-2xs flex items-center justify-between gap-2.5 transition group"
+                                  >
+                                    <div className="space-y-1 min-w-0 flex-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                                          {item.category}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                          isCard ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-900'
+                                        }`}>
+                                          {isCard ? '💳 카드' : '💵 현금'}
+                                        </span>
+                                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium">{item.expense_date}</span>
+                                      </div>
+                                      <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">{item.title}</p>
+                                    </div>
+
+                                    <div className="text-right shrink-0">
+                                      <p className="text-xs sm:text-sm font-black text-slate-900">
+                                        -{(item.amount || item.amount_krw || 0).toLocaleString()} {selectedTrip.currency_unit}
+                                      </p>
+                                      {exchangeRate > 0 && (
+                                        <p className="text-[10px] text-slate-400 font-semibold">
+                                          (약 ₩{Math.round((item.amount || 0) * exchangeRate).toLocaleString()}원)
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleDeleteExpense(item.id)}
+                                      className="p-1 text-slate-300 hover:text-red-500 transition cursor-pointer shrink-0"
+                                      title="삭제"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                );
+                              })
                             )}
                           </div>
-
-                          <button
-                            onClick={() => handleDeleteExpense(item.id)}
-                            className="p-1 text-slate-300 hover:text-red-500 transition cursor-pointer shrink-0"
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </div>
                       );
-                    })
-                  )}
-                </div>
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
