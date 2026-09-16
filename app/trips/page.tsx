@@ -74,6 +74,7 @@ export default function TripsPage() {
 
   const [activeDayNum, setActiveDayNum] = useState<number>(1);
   const sliderRef = useRef<HTMLDivElement>(null);
+  const dayTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // 여행 프로젝트 모달
   const [isAddTripModalOpen, setIsAddTripModalOpen] = useState(false);
@@ -398,6 +399,27 @@ export default function TripsPage() {
     return days;
   };
 
+  // 🌟 오차 보정된 스와이프 감지 함수 (1단계씩 정확히 연동)
+  const handleScroll = () => {
+    if (!sliderRef.current) return;
+    const { scrollLeft, clientWidth } = sliderRef.current;
+    if (clientWidth <= 0) return;
+    
+    // 카드 중간 지점 기준 1단계씩 계산
+    const currentDay = Math.floor((scrollLeft + clientWidth / 2) / clientWidth) + 1;
+    const total = selectedTrip ? getTimelineDays(selectedTrip.start_date, selectedTrip.end_date).length : 1;
+    const validDay = Math.max(1, Math.min(total, currentDay));
+
+    if (validDay !== activeDayNum) {
+      setActiveDayNum(validDay);
+      dayTabRefs.current[validDay - 1]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  };
+
   const scrollToDay = (dayNum: number) => {
     setActiveDayNum(dayNum);
     if (sliderRef.current) {
@@ -407,6 +429,11 @@ export default function TripsPage() {
         behavior: 'smooth',
       });
     }
+    dayTabRefs.current[dayNum - 1]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
   };
 
   const packingItems = tripItems.filter((i) => i.type === 'packing');
@@ -442,10 +469,9 @@ export default function TripsPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 리스트 영역 */}
+        {/* 좌측: 모바일 토글형 / PC 고정형 여행 리스트 영역 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
           
-          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 헤더 유지) */}
           <div 
             onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
             className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
@@ -469,7 +495,6 @@ export default function TripsPage() {
             </div>
           </div>
 
-          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
           <div className={`space-y-2.5 overflow-y-auto flex-1 pr-1 transition-all ${
             isMobileTripListOpen ? 'mt-3 max-h-[220px] block' : 'hidden lg:block'
           }`}>
@@ -492,7 +517,7 @@ export default function TripsPage() {
                     key={trip.id}
                     onClick={() => {
                       setSelectedTrip(trip);
-                      setIsMobileTripListOpen(false); // 모바일에서 여행 선택 후 토글 자동 닫기
+                      setIsMobileTripListOpen(false);
                     }}
                     className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2 ${
                       isSelected
@@ -603,20 +628,19 @@ export default function TripsPage() {
               {/* 탭 1: Day 타임라인 */}
               {activeTab === 'timeline' && (
                 <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                  {/* Day 선택 탭 */}
+                  {/* Day 선택 탭 헤더 (가로 스크롤바 완전 가림) */}
                   <div 
-                    className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 shrink-0 overflow-x-auto no-scrollbar"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-100 shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
                     <div 
-                      className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar"
-                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      className="flex items-center gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                     >
-                      {getTimelineDays(selectedTrip.start_date, selectedTrip.end_date).map((d) => (
+                      {getTimelineDays(selectedTrip.start_date, selectedTrip.end_date).map((d, idx) => (
                         <button
                           key={d.dayNum}
+                          ref={(el) => { dayTabRefs.current[idx] = el; }}
                           onClick={() => scrollToDay(d.dayNum)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
                             activeDayNum === d.dayNum
                               ? 'text-white shadow-xs'
                               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -630,7 +654,8 @@ export default function TripsPage() {
                       ))}
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    {/* PC 전용 화살표 */}
+                    <div className="hidden lg:flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => scrollToDay(Math.max(1, activeDayNum - 1))}
                         disabled={activeDayNum === 1}
@@ -648,11 +673,11 @@ export default function TripsPage() {
                     </div>
                   </div>
 
-                  {/* 스와이프 슬라이더 카드 */}
+                  {/* 스와이프 슬라이더 (가로 스크롤바 완전 숨김 + onScroll 연동) */}
                   <div 
                     ref={sliderRef}
-                    className="flex-1 overflow-x-auto flex snap-x snap-mandatory scroll-smooth min-h-0 divide-x divide-transparent no-scrollbar"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-x-auto flex snap-x snap-mandatory scroll-smooth min-h-0 divide-x divide-transparent [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {getTimelineDays(selectedTrip.start_date, selectedTrip.end_date).map((d) => {
                       const dayPlans = tripPlans.filter((p) => p.day_num === d.dayNum);
