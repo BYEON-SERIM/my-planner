@@ -140,12 +140,18 @@ export default function ExpensesPage() {
   };
 
   const fetchExpenses = async (tripId: string) => {
+    // 1. 현재 로그인한 유저 정보 가져오기
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+  
+    // 2. trip_id와 user_id 두 조건이 모두 일치하는 내 경비만 조회
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
       .eq('trip_id', tripId)
+      .eq('user_id', user.id) // 🌟 내 데이터만 필터링
       .order('expense_date', { ascending: false });
-
+  
     if (!error && data) {
       setExpenses(data);
     }
