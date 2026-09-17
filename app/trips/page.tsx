@@ -248,7 +248,7 @@ export default function TripsPage() {
     });
   
     if (!error && data) {
-      setMembersList(data);
+      setMembersList(data); // 이제 data 내의 email 필드에 '이름' 또는 '이메일'이 담겨 옵니다.
     }
   };
 
