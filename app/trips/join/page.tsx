@@ -29,7 +29,7 @@ function JoinTripContent() {
         return;
       }
 
-      const res = await fetch('/api/trips/share', {
+      const res = await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, userId: user.id }),

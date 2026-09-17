@@ -192,6 +192,7 @@ export default function TripsPage() {
           .eq('id', trip.id);
       }
 
+      // 🌟 join 페이지로 넘겨줄 URL (정상)
       const shareUrl = `${window.location.origin}/trips/join?token=${token}`;
       await navigator.clipboard.writeText(shareUrl);
       alert('🌟 초대를 위한 공유 링크가 복사되었습니다!\n이 링크로 접속하여 구글 로그인 시 동행자로 함께 관리할 수 있습니다.');
