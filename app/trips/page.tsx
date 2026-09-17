@@ -69,6 +69,7 @@ interface TripPlan {
 interface TripMember {
   id: string;
   user_id: string;
+  email?: string; 
   created_at: string;
 }
 
@@ -240,28 +241,31 @@ export default function TripsPage() {
     }
   };
 
-  // 🌟 동행자 목록 가져오기
+  // 🌟 동행자 목록 가져오기 (API 라우트 경유하지 않고 Supabase 직접 조회)
   const fetchMembers = async (tripId: string) => {
-    const res = await fetch(`/api/trips/members?tripId=${tripId}`);
-    const data = await res.json();
-    if (res.ok) {
-      setMembersList(data.members || []);
+    const { data, error } = await supabase.rpc('get_trip_members_with_email', {
+      trip_id_input: tripId
+    });
+  
+    if (!error && data) {
+      setMembersList(data);
     }
   };
 
-  // 🌟 특정 동행자 내보내기 (공유 해제)
+  // 🌟 특정 동행자 내보내기 (공유 해제 - Supabase 직접 삭제)
   const handleRemoveMember = async (memberId: string) => {
     if (!confirm('이 동행자의 공유 권한을 해제하시겠습니까?')) return;
 
-    const res = await fetch('/api/trips/members', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memberId }),
-    });
+    const { error } = await supabase
+      .from('trip_members')
+      .delete()
+      .eq('id', memberId);
 
-    if (res.ok && selectedTrip) {
+    if (!error && selectedTrip) {
       alert('공유가 해제되었습니다.');
       fetchMembers(selectedTrip.id);
+    } else if (error) {
+      alert(`해제 실패: ${error.message}`);
     }
   };
 
@@ -1024,8 +1028,8 @@ export default function TripsPage() {
               ) : (
                 membersList.map((m) => (
                   <div key={m.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs">
-                    <span className="font-bold text-slate-700 truncate max-w-[170px]" title={m.user_id}>
-                      {m.user_id}
+                    <span className="font-bold text-slate-700 truncate max-w-[170px]" title={m.email || m.user_id}>
+                      {m.email || m.user_id}
                     </span>
 
                     <button

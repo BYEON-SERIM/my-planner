@@ -1,47 +1,30 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
-// 1. 동행자 목록 조회
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const tripId = searchParams.get('tripId');
-
-  if (!tripId) {
-    return NextResponse.json({ error: 'tripId가 필요합니다.' }, { status: 400 });
-  }
-
-  // trip_members 조회
-  const { data: members, error } = await supabase
-    .from('trip_members')
-    .select('id, user_id, created_at')
-    .eq('trip_id', tripId);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ members });
-}
-
-// 2. 동행자 삭제 (공유 해제)
-export async function DELETE(request: Request) {
   try {
-    const { memberId } = await request.json();
+    const { searchParams } = new URL(request.url);
+    const tripId = searchParams.get('tripId');
 
-    if (!memberId) {
-      return NextResponse.json({ error: 'memberId가 필요합니다.' }, { status: 400 });
+    if (!tripId) {
+      return NextResponse.json({ error: 'tripId가 필요합니다.' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    // trip_members 테이블에서 해당 여행의 동행자 목록 조회
+    const { data: members, error } = await supabase
       .from('trip_members')
-      .delete()
-      .eq('id', memberId);
+      .select('id, user_id, created_at')
+      .eq('trip_id', tripId);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ members });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || '서버 에러' }, { status: 500 });
   }
