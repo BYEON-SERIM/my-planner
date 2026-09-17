@@ -205,7 +205,8 @@ export default function TripsPage() {
     }
   };
 
-  // 🌟 입력받은 공유 코드로 여행 직접 참여하기 함수
+
+  // 🌟 RPC 함수를 호출하여 완벽하게 안전하게 토큰 검증 & 멤버 등록
   const handleJoinByToken = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanToken = inputShareToken.trim();
@@ -213,47 +214,25 @@ export default function TripsPage() {
 
     setIsJoining(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert('로그인이 필요합니다.');
+      // Supabase RPC 함수 호출
+      const { data, error } = await supabase.rpc('join_trip_by_token', {
+        token_input: cleanToken,
+      });
+
+      if (error) {
+        alert(`참여 실패: ${error.message}`);
         setIsJoining(false);
         return;
       }
 
-      // 1. 입력받은 토큰으로 여행 정보 찾기
-      const { data: trip, error: tripError } = await supabase
-        .from('trips')
-        .select('id, user_id, title')
-        .eq('share_token', cleanToken)
-        .maybeSingle();
-
-      if (tripError || !trip) {
-        alert('유효하지 않은 공유 코드입니다. 코드를 다시 확인해 주세요.');
-        setIsJoining(false);
-        return;
+      if (data && data.success) {
+        alert(`🎉 ${data.message}`);
+        setInputShareToken('');
+        setIsJoinByTokenModalOpen(false);
+        fetchTrips(); // 목록 새로고침
+      } else {
+        alert(data.message || '참여 처리에 실패했습니다.');
       }
-
-      if (trip.user_id === user.id) {
-        alert('본인이 작성한 여행 프로젝트입니다.');
-        setIsJoining(false);
-        return;
-      }
-
-      // 2. trip_members 테이블에 내 계정 추가
-      const { error: insertError } = await supabase
-        .from('trip_members')
-        .upsert([{ trip_id: trip.id, user_id: user.id }], { onConflict: 'trip_id,user_id' });
-
-      if (insertError) {
-        alert(`참여 처리 실패: ${insertError.message}`);
-        setIsJoining(false);
-        return;
-      }
-
-      alert(`🎉 '${trip.title}' 여행 프로젝트의 동행자로 성공적으로 합류되었습니다!`);
-      setInputShareToken('');
-      setIsJoinByTokenModalOpen(false);
-      fetchTrips();
     } catch (err) {
       alert('참여 처리 도중 에러가 발생했습니다.');
     } finally {
