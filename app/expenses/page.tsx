@@ -20,7 +20,9 @@ import {
   List,
   ChevronDown,
   ChevronUp,
-  Calendar
+  Calendar,
+  Users,
+  Calculator
 } from 'lucide-react';
 
 interface Trip {
@@ -50,7 +52,7 @@ export default function ExpensesPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [myBudgetAmount, setMyBudgetAmount] = useState<number>(0); // 🌟 내 개인 환전금
+  const [myBudgetAmount, setMyBudgetAmount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   // 모바일 여행 리스트 토글 상태
@@ -78,6 +80,11 @@ export default function ExpensesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'현금' | '카드'>('현금');
   const [amount, setAmount] = useState<string>('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 🌟 [추가] 더치페이 정산 관련 상태
+  const [isDutchPay, setIsDutchPay] = useState<boolean>(false);
+  const [dutchPeopleCount, setDutchPeopleCount] = useState<number>(2);
+  const [totalTripMembersCount, setTotalTripMembersCount] = useState<number>(1);
 
   // 스와이프 슬라이더 및 상단 Day 탭 Ref
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -140,12 +147,23 @@ export default function ExpensesPage() {
     setLoading(false);
   };
 
-  // 🌟 내 개인 환전금(BUDGET) 및 내 지출 내역만 격리하여 가져오는 함수
+  // 🌟 동행자 전체 인원수 불러오기 (방장 + 동행자)
+  const fetchTripMembersCount = async (tripId: string) => {
+    const { data } = await supabase.rpc('get_trip_members_with_email', {
+      trip_id_input: tripId
+    });
+    // 나를 포함한 방장 + 멤버 수
+    const count = (data?.length || 0) + 1; 
+    setTotalTripMembersCount(count);
+    if (count > 1) {
+      setDutchPeopleCount(count);
+    }
+  };
+
   const fetchExpenses = async (tripId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // 내 user_id 데이터만 조회하여 다른 동행자 데이터 노출 차단
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
@@ -154,12 +172,10 @@ export default function ExpensesPage() {
       .order('expense_date', { ascending: false });
 
     if (!error && data) {
-      // 1) 내 개인 환전금(category = 'BUDGET') 분리
       const budgetItem = data.find((item) => item.category === 'BUDGET');
       const myBudget = budgetItem ? Number(budgetItem.amount || 0) : 0;
       setMyBudgetAmount(myBudget);
 
-      // 2) 실제 지출 내역만 분리 (BUDGET 제외)
       const actualExpenses = data.filter((item) => item.category !== 'BUDGET');
       setExpenses(actualExpenses);
     }
@@ -172,13 +188,13 @@ export default function ExpensesPage() {
   useEffect(() => {
     if (selectedTrip) {
       fetchExpenses(selectedTrip.id);
+      fetchTripMembersCount(selectedTrip.id);
       setCurrencyUnit(selectedTrip.currency_unit || '엔');
       fetchExchangeRate(selectedTrip.currency_unit || '엔');
       setSelectedDayFilter('all');
     }
   }, [selectedTrip]);
 
-  // 🌟 내 개인 총 환전금 저장/수정 함수 (expenses 테이블에 내 user_id로 저장)
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTrip) return;
@@ -189,13 +205,11 @@ export default function ExpensesPage() {
       return;
     }
 
-    // 1) trips 테이블 화폐 단위 업데이트
     await supabase
       .from('trips')
       .update({ currency_unit: currencyUnit })
       .eq('id', selectedTrip.id);
 
-    // 2) expenses 테이블에 내 계정의 환전금(BUDGET) 저장 (UPSERT)
     const { error: budgetError } = await supabase
       .from('expenses')
       .upsert(
@@ -222,6 +236,7 @@ export default function ExpensesPage() {
     }
   };
 
+  // 🌟 지출 추가 (더치페이 금액 입력 옵션 적용)
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTrip || !expenseTitle.trim()) return;
@@ -232,16 +247,25 @@ export default function ExpensesPage() {
       return;
     }
 
-    const finalAmount = parseFloat(amount) || 0;
-    const calcKrw = exchangeRate > 0 ? Math.round(finalAmount * exchangeRate) : finalAmount;
+    let inputAmount = parseFloat(amount) || 0;
+    let finalTitle = expenseTitle.trim();
+
+    // 🌟 더치페이 모드인 경우: 내 지출(1인분 금액)만 계산해서 내 가계부에 기록
+    if (isDutchPay && dutchPeopleCount > 1) {
+      const perPersonAmount = Math.round(inputAmount / dutchPeopleCount);
+      finalTitle = `${expenseTitle.trim()} (더치페이 ${dutchPeopleCount}명/총 ${inputAmount.toLocaleString()}${selectedTrip.currency_unit || '엔'})`;
+      inputAmount = perPersonAmount; // 1인분 금액으로 내 가계부 등록
+    }
+
+    const calcKrw = exchangeRate > 0 ? Math.round(inputAmount * exchangeRate) : inputAmount;
 
     const { error } = await supabase.from('expenses').insert([
       {
         trip_id: selectedTrip.id,
-        user_id: user.id, // 🌟 내 작성자 ID 등록
-        title: expenseTitle,
+        user_id: user.id,
+        title: finalTitle,
         category: expenseCategory,
-        amount: finalAmount,
+        amount: inputAmount,
         amount_krw: calcKrw,
         payment_method: paymentMethod,
         expense_date: expenseDate,
@@ -252,6 +276,7 @@ export default function ExpensesPage() {
       setIsExpenseModalOpen(false);
       setExpenseTitle('');
       setAmount('');
+      setIsDutchPay(false);
       fetchExpenses(selectedTrip.id);
     }
   };
@@ -324,7 +349,6 @@ export default function ExpensesPage() {
     });
   };
 
-  // 선택된 Day 필터에 따른 내 지출 내역 가공
   const filteredExpenses = expenses.filter((item) => {
     if (selectedDayFilter === 'all') return true;
     const targetDayObj = tripDays.find((d) => d.dayNum === selectedDayFilter);
@@ -341,12 +365,15 @@ export default function ExpensesPage() {
     .filter((e) => e.payment_method === '카드')
     .reduce((sum, item) => sum + (item.amount || item.amount_krw || 0), 0);
 
-  // 🌟 내 개인 총 환전금과 현금 지출로 남아있는 잔액 계산
   const totalExchanged = myBudgetAmount;
   const remainingCash = totalExchanged - totalSpentCash;
   const usagePercent = totalExchanged > 0 ? Math.min(Math.round((totalSpentCash / totalExchanged) * 100), 100) : 0;
 
   const themeColor = selectedTrip?.color || '#3b82f6';
+
+  // 🌟 더치페이 계산값
+  const rawInputAmount = parseFloat(amount) || 0;
+  const perPersonAmount = dutchPeopleCount > 0 ? Math.round(rawInputAmount / dutchPeopleCount) : 0;
 
   return (
     <div className="space-y-3.5 sm:space-y-4 w-full flex flex-col h-auto lg:h-[calc(100vh-90px)]">
@@ -867,7 +894,7 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {/* 4. 지출 등록 모달 */}
+      {/* 4. 지출 등록 모달 (더치페이 계산기 포함) */}
       {isExpenseModalOpen && selectedTrip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
@@ -933,19 +960,93 @@ export default function ExpensesPage() {
                 />
               </div>
 
+              {/* 🌟 더치페이 정산 토글 및 인원 설정 세션 */}
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Calculator size={14} className="text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-800">N분의 1 더치페이 정산</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDutchPay(!isDutchPay)}
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
+                      isDutchPay 
+                        ? 'bg-indigo-600 text-white border-indigo-600' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {isDutchPay ? '사용 중 ON' : '사용 안함'}
+                  </button>
+                </div>
+
+                {isDutchPay && (
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                        <Users size={12} /> 정산 인원수
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDutchPeopleCount(Math.max(2, dutchPeopleCount - 1))}
+                          className="w-6 h-6 rounded-lg bg-white border border-slate-200 font-bold text-xs text-slate-700 flex items-center justify-center hover:bg-slate-100"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-black text-slate-900 w-6 text-center">
+                          {dutchPeopleCount}명
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setDutchPeopleCount(dutchPeopleCount + 1)}
+                          className="w-6 h-6 rounded-lg bg-white border border-slate-200 font-bold text-xs text-slate-700 flex items-center justify-center hover:bg-slate-100"
+                        >
+                          +
+                        </button>
+                        
+                        {totalTripMembersCount > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDutchPeopleCount(totalTripMembersCount)}
+                            className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md border border-indigo-100 ml-1"
+                          >
+                            전체 멤버({totalTripMembersCount}명)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {rawInputAmount > 0 && (
+                      <div className="bg-indigo-50/70 p-2 rounded-lg border border-indigo-100 flex items-center justify-between text-xs">
+                        <span className="font-bold text-indigo-900">내 결제 부담금 (1인분):</span>
+                        <div className="text-right font-black text-indigo-700">
+                          <span>{perPersonAmount.toLocaleString()} {selectedTrip.currency_unit || '엔'}</span>
+                          {exchangeRate > 0 && (
+                            <span className="text-[10px] text-indigo-400 font-normal ml-1 block">
+                              (약 ₩{Math.round(perPersonAmount * exchangeRate).toLocaleString()}원)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-slate-400 mb-1 block">
-                  지출 금액 ({selectedTrip.currency_unit || '엔'})
+                  {isDutchPay ? `총 결제 금액 (${selectedTrip.currency_unit || '엔'})` : `지출 금액 (${selectedTrip.currency_unit || '엔'})`}
                 </label>
                 <input
                   type="number"
-                  placeholder="예: 1500"
+                  placeholder={isDutchPay ? "예: 4000 (전체 결제한 총액)" : "예: 1500"}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full text-xs sm:text-sm font-bold text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
                   required
                 />
-                {exchangeRate > 0 && amount && (
+                {!isDutchPay && exchangeRate > 0 && amount && (
                   <p className="text-[11px] font-semibold text-blue-600 mt-1">
                     예상 원화: 약 ₩{Math.round(parseFloat(amount) * exchangeRate).toLocaleString()}원
                   </p>
