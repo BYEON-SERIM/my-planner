@@ -25,7 +25,8 @@ import {
   ExternalLink,
   Share2,
   Users,
-  UserX
+  UserX,
+  UserPlus
 } from 'lucide-react';
 
 interface Trip {
@@ -88,6 +89,11 @@ export default function TripsPage() {
   // 🌟 동행자 목록 모달 상태
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [membersList, setMembersList] = useState<TripMember[]>([]);
+
+  // 🌟 공유 코드로 참여하기 모달 및 상태
+  const [isJoinByTokenModalOpen, setIsJoinByTokenModalOpen] = useState(false);
+  const [inputShareToken, setInputShareToken] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
 
   // 여행 등록/수정 모달 상태
   const [isAddTripModalOpen, setIsAddTripModalOpen] = useState(false);
@@ -172,7 +178,7 @@ export default function TripsPage() {
     }
   }, [selectedTrip]);
 
-  // 🌟 공유 링크 생성
+  // 🌟 공유 코드 복사 (코드를 보여주고 바로 복사하도록 제공)
   const handleShareTrip = async (trip: Trip, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
@@ -192,12 +198,66 @@ export default function TripsPage() {
           .eq('id', trip.id);
       }
 
-      // 🌟 join 페이지로 넘겨줄 URL (정상)
-      const shareUrl = `${window.location.origin}/trips/join?token=${token}`;
-      await navigator.clipboard.writeText(shareUrl);
-      alert('🌟 초대를 위한 공유 링크가 복사되었습니다!\n이 링크로 접속하여 구글 로그인 시 동행자로 함께 관리할 수 있습니다.');
+      await navigator.clipboard.writeText(token);
+      alert(`🌟 동행자 초대 공유 코드가 복사되었습니다!\n\n공유 코드: ${token}\n\n상대방이 [공유 코드로 참여] 버튼을 눌러 이 코드를 입력하면 동행자로 등록됩니다.`);
     } catch (err) {
-      alert('공유 링크 복사에 실패했습니다.');
+      alert('공유 코드 복사에 실패했습니다.');
+    }
+  };
+
+  // 🌟 입력받은 공유 코드로 여행 직접 참여하기 함수
+  const handleJoinByToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanToken = inputShareToken.trim();
+    if (!cleanToken) return;
+
+    setIsJoining(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('로그인이 필요합니다.');
+        setIsJoining(false);
+        return;
+      }
+
+      // 1. 입력받은 토큰으로 여행 정보 찾기
+      const { data: trip, error: tripError } = await supabase
+        .from('trips')
+        .select('id, user_id, title')
+        .eq('share_token', cleanToken)
+        .maybeSingle();
+
+      if (tripError || !trip) {
+        alert('유효하지 않은 공유 코드입니다. 코드를 다시 확인해 주세요.');
+        setIsJoining(false);
+        return;
+      }
+
+      if (trip.user_id === user.id) {
+        alert('본인이 작성한 여행 프로젝트입니다.');
+        setIsJoining(false);
+        return;
+      }
+
+      // 2. trip_members 테이블에 내 계정 추가
+      const { error: insertError } = await supabase
+        .from('trip_members')
+        .upsert([{ trip_id: trip.id, user_id: user.id }], { onConflict: 'trip_id,user_id' });
+
+      if (insertError) {
+        alert(`참여 처리 실패: ${insertError.message}`);
+        setIsJoining(false);
+        return;
+      }
+
+      alert(`🎉 '${trip.title}' 여행 프로젝트의 동행자로 성공적으로 합류되었습니다!`);
+      setInputShareToken('');
+      setIsJoinByTokenModalOpen(false);
+      fetchTrips();
+    } catch (err) {
+      alert('참여 처리 도중 에러가 발생했습니다.');
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -514,17 +574,33 @@ export default function TripsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setIsAddTripModalOpen(true);
-          }}
-          className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
-        >
-          <Plus size={16} className="shrink-0" />
-          <span className="hidden sm:inline">새 여행 등록</span>
-          <span className="sm:hidden">등록</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 🌟 공유 코드로 참여하기 버튼 */}
+          <button
+            onClick={() => {
+              setInputShareToken('');
+              setIsJoinByTokenModalOpen(true);
+            }}
+            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <UserPlus size={16} className="shrink-0" />
+            <span className="hidden sm:inline">공유 코드로 참여</span>
+            <span className="sm:hidden">참여</span>
+          </button>
+
+          {/* 새 여행 등록 버튼 */}
+          <button
+            onClick={() => {
+              resetForm();
+              setIsAddTripModalOpen(true);
+            }}
+            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200/60 text-xs sm:text-sm font-bold px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <Plus size={16} className="shrink-0" />
+            <span className="hidden sm:inline">새 여행 등록</span>
+            <span className="sm:hidden">등록</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. 메인 스플릿 레이아웃 */}
@@ -618,7 +694,7 @@ export default function TripsPage() {
                         <button
                           onClick={(e) => handleShareTrip(trip, e)}
                           className="p-1 text-slate-400 hover:text-emerald-600 transition cursor-pointer"
-                          title="동행자 초대 링크 복사"
+                          title="동행자 초대 코드 복사"
                         >
                           <Share2 size={13} />
                         </button>
@@ -683,7 +759,7 @@ export default function TripsPage() {
                     <button
                       onClick={() => handleShareTrip(selectedTrip)}
                       className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                      title="동행자 초대 링크 복사"
+                      title="동행자 초대 코드 복사"
                     >
                       <Share2 size={14} />
                       <span className="hidden sm:inline">공유</span>
@@ -964,7 +1040,7 @@ export default function TripsPage() {
               {membersList.length === 0 ? (
                 <div className="py-8 text-center space-y-1">
                   <UserX size={24} className="text-slate-300 mx-auto" />
-                  <p className="text-xs text-slate-400">아직 참여한 동행자가 없습니다.<br/>[공유] 버튼을 눌러 링크를 전달해보세요!</p>
+                  <p className="text-xs text-slate-400">아직 참여한 동행자가 없습니다.<br/>[공유] 버튼을 눌러 코드를 전달해보세요!</p>
                 </div>
               ) : (
                 membersList.map((m) => (
@@ -992,6 +1068,54 @@ export default function TripsPage() {
                 닫기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 🔑 공유 코드로 참여하기 모달 */}
+      {isJoinByTokenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
+                <UserPlus size={18} className="text-emerald-600" /> 공유 코드로 참여
+              </h2>
+              <button onClick={() => setIsJoinByTokenModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleJoinByToken} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">공유 코드 입력</label>
+                <input
+                  type="text"
+                  placeholder="전달받은 공유 코드를 붙여넣으세요"
+                  value={inputShareToken}
+                  onChange={(e) => setInputShareToken(e.target.value)}
+                  className="w-full text-xs sm:text-sm font-medium text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-emerald-600"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsJoinByTokenModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={isJoining}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200/60 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer transition disabled:opacity-50"
+                >
+                  {isJoining ? '참여 처리 중...' : '참여하기'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
