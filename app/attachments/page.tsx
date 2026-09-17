@@ -100,22 +100,30 @@ export default function AttachmentsPage() {
     setLoading(false);
   };
 
+  // 🌟 서류 불러오기 함수 (콘솔 출력 추가 및 쿼리 최적화)
   const fetchAttachments = async (tripId: string) => {
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('attachments')
       .select('*')
       .eq('trip_id', tripId)
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      const backupResult = await supabase
+    if (error) {
+      console.error('attachments 조회 에러:', error.message);
+    }
+
+    if (data && data.length > 0) {
+      setAttachments(data as AttachmentItem[]);
+    } else {
+      // backup 테이블 조회
+      const { data: backupData } = await supabase
         .from('trip_attachments')
         .select('*')
         .eq('trip_id', tripId)
         .order('created_at', { ascending: false });
 
-      if (!backupResult.error && backupResult.data) {
-        data = backupResult.data.map((item: any) => ({
+      if (backupData) {
+        const formatted = backupData.map((item: any) => ({
           id: item.id,
           trip_id: item.trip_id,
           file_name: item.file_name || item.title || '예약 서류',
@@ -128,11 +136,10 @@ export default function AttachmentsPage() {
           memo: item.memo || '',
           created_at: item.created_at,
         }));
+        setAttachments(formatted as AttachmentItem[]);
+      } else {
+        setAttachments([]);
       }
-    }
-
-    if (data) {
-      setAttachments(data as AttachmentItem[]);
     }
   };
 
@@ -302,10 +309,8 @@ export default function AttachmentsPage() {
       {/* 2. 메인 스플릿 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-5 flex-1 min-h-0">
         
-        {/* 🌟 좌측: 모바일 토글형 / PC 고정형 여행 선택 영역 */}
+        {/* 좌측 여행 선택 */}
         <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-4 flex flex-col shrink-0 lg:min-h-0">
-          
-          {/* 모바일 전용 토글 헤더 버튼 (PC에서는 일반 타이틀로 헤더 유지) */}
           <div 
             onClick={() => setIsMobileTripListOpen(!isMobileTripListOpen)}
             className="flex items-center justify-between cursor-pointer lg:cursor-default lg:border-b lg:border-slate-100 lg:pb-2.5 lg:mb-2.5 shrink-0"
@@ -329,7 +334,6 @@ export default function AttachmentsPage() {
             </div>
           </div>
 
-          {/* 여행 카드 목록 (모바일은 토글 open 시만 보임, PC는 항상 보임) */}
           <div className={`space-y-2 overflow-y-auto flex-1 pr-1 transition-all ${
             isMobileTripListOpen ? 'mt-3 max-h-[220px] block' : 'hidden lg:block'
           }`}>
@@ -350,7 +354,7 @@ export default function AttachmentsPage() {
                     key={trip.id}
                     onClick={() => {
                       setSelectedTrip(trip);
-                      setIsMobileTripListOpen(false); // 모바일에서 선택 후 자동 닫기
+                      setIsMobileTripListOpen(false);
                     }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex items-center justify-between ${
                       isSelected
@@ -377,11 +381,10 @@ export default function AttachmentsPage() {
           </div>
         </div>
 
-        {/* 우측 서류 상세 카드 리스트 */}
+        {/* 우측 서류 카드 리스트 */}
         <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 shadow-xs p-3.5 sm:p-5 flex flex-col min-h-[400px] lg:min-h-0">
           {selectedTrip ? (
             <div className="flex flex-col h-full space-y-3.5">
-              {/* 서류 목록 헤더 */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 shrink-0 gap-2">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <FileCheck className="text-blue-600 shrink-0" size={18} />
@@ -394,7 +397,6 @@ export default function AttachmentsPage() {
                 </span>
               </div>
 
-              {/* 드래그/클릭 업로드 구역 */}
               <div 
                 onClick={handleOpenAddModal}
                 className="p-3.5 sm:p-4 border-2 border-dashed border-blue-200 hover:border-blue-500 bg-blue-50/30 rounded-2xl text-center space-y-1 cursor-pointer transition shrink-0"
@@ -404,12 +406,11 @@ export default function AttachmentsPage() {
                 <p className="text-[10px] sm:text-[11px] text-slate-400">호텔 예약번호나 바우처 메모도 함께 정리할 수 있습니다.</p>
               </div>
 
-              {/* 상세 카드 목록 */}
               <div className="space-y-3 overflow-y-auto flex-1 pr-1 min-h-0">
                 {attachments.length === 0 ? (
                   <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl space-y-1">
                     <p className="text-xs sm:text-sm font-semibold text-slate-500">등록된 예약서류가 없습니다.</p>
-                    <p className="text-[11px] text-slate-400">상단의 [등록]을 눌러 파일과 정보를 입력해보세요.</p>
+                    <p className="text-[11px] text-slate-400">좌측에서 다른 여행 프로젝트를 선택해보거나 새 서류를 등록해 보세요.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
@@ -422,7 +423,6 @@ export default function AttachmentsPage() {
                           className="p-3.5 sm:p-4 bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl shadow-2xs flex flex-col justify-between space-y-3 transition group"
                         >
                           <div className="space-y-2">
-                            {/* 상단 태그 및 수정/삭제 액션 */}
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
                                 <Icon size={12} /> {item.category || '기타'}
@@ -446,7 +446,6 @@ export default function AttachmentsPage() {
                               </div>
                             </div>
 
-                            {/* 파일명 & 메모 */}
                             <div>
                               <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug truncate" title={item.file_name}>
                                 {item.file_name}
@@ -458,7 +457,6 @@ export default function AttachmentsPage() {
                               )}
                             </div>
 
-                            {/* 예약 번호 복사 바 */}
                             {item.booking_no && (
                               <div className="flex items-center justify-between bg-slate-100/80 px-2 py-1 rounded-lg text-xs font-semibold text-slate-700">
                                 <span className="truncate text-[11px] sm:text-xs">예약번호: <strong className="font-bold text-slate-900">{item.booking_no}</strong></span>
@@ -474,7 +472,6 @@ export default function AttachmentsPage() {
                             )}
                           </div>
 
-                          {/* 열람 및 원본보기 액션 바 */}
                           <div className="border-t border-slate-100 pt-2 flex items-center justify-between">
                             {item.public_url ? (
                               <>
@@ -512,7 +509,7 @@ export default function AttachmentsPage() {
         </div>
       </div>
 
-      {/* 3. 서류 등록 & 수정 모달 */}
+      {/* 3. 모달 및 팝업 생략없이 이전 동일 */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md p-5 sm:p-6 space-y-4">
@@ -550,9 +547,6 @@ export default function AttachmentsPage() {
                   className="w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 p-2 rounded-xl outline-none"
                   accept="image/*,.pdf"
                 />
-                {editingItem && !selectedFile && (
-                  <p className="text-[11px] text-blue-600 font-semibold mt-1">✓ 기존 파일이 등록되어 있습니다.</p>
-                )}
               </div>
 
               <div>
@@ -611,7 +605,6 @@ export default function AttachmentsPage() {
         </div>
       )}
 
-      {/* 4. 미리보기 팝업 모달 */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">

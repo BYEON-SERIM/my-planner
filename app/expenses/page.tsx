@@ -30,26 +30,27 @@ interface Trip {
   start_date: string;
   end_date: string;
   color: string;
-  exchanged_amount: number;
-  currency_unit: string;
+  currency_unit?: string;
 }
 
 interface Expense {
   id: string;
   trip_id: string;
-  title: string;
+  user_id?: string;
+  title?: string;
   category: string;
   amount: number;
   amount_krw?: number;
   payment_method?: '현금' | '카드';
   expense_date: string;
-  created_at: string;
+  created_at?: string;
 }
 
 export default function ExpensesPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [myBudgetAmount, setMyBudgetAmount] = useState<number>(0); // 🌟 내 개인 환전금
   const [loading, setLoading] = useState(true);
 
   // 모바일 여행 리스트 토글 상태
@@ -139,21 +140,28 @@ export default function ExpensesPage() {
     setLoading(false);
   };
 
+  // 🌟 내 개인 환전금(BUDGET) 및 내 지출 내역만 격리하여 가져오는 함수
   const fetchExpenses = async (tripId: string) => {
-    // 1. 현재 로그인한 유저 정보 가져오기
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-  
-    // 2. trip_id와 user_id 두 조건이 모두 일치하는 내 경비만 조회
+
+    // 내 user_id 데이터만 조회하여 다른 동행자 데이터 노출 차단
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
       .eq('trip_id', tripId)
-      .eq('user_id', user.id) // 🌟 내 데이터만 필터링
+      .eq('user_id', user.id)
       .order('expense_date', { ascending: false });
-  
+
     if (!error && data) {
-      setExpenses(data);
+      // 1) 내 개인 환전금(category = 'BUDGET') 분리
+      const budgetItem = data.find((item) => item.category === 'BUDGET');
+      const myBudget = budgetItem ? Number(budgetItem.amount || 0) : 0;
+      setMyBudgetAmount(myBudget);
+
+      // 2) 실제 지출 내역만 분리 (BUDGET 제외)
+      const actualExpenses = data.filter((item) => item.category !== 'BUDGET');
+      setExpenses(actualExpenses);
     }
   };
 
@@ -164,35 +172,53 @@ export default function ExpensesPage() {
   useEffect(() => {
     if (selectedTrip) {
       fetchExpenses(selectedTrip.id);
-      setExchangedAmount(selectedTrip.exchanged_amount || 0);
       setCurrencyUnit(selectedTrip.currency_unit || '엔');
       fetchExchangeRate(selectedTrip.currency_unit || '엔');
       setSelectedDayFilter('all');
     }
   }, [selectedTrip]);
 
+  // 🌟 내 개인 총 환전금 저장/수정 함수 (expenses 테이블에 내 user_id로 저장)
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTrip) return;
 
-    const { error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    // 1) trips 테이블 화폐 단위 업데이트
+    await supabase
       .from('trips')
-      .update({
-        exchanged_amount: exchangedAmount,
-        currency_unit: currencyUnit,
-      })
+      .update({ currency_unit: currencyUnit })
       .eq('id', selectedTrip.id);
 
-    if (!error) {
+    // 2) expenses 테이블에 내 계정의 환전금(BUDGET) 저장 (UPSERT)
+    const { error: budgetError } = await supabase
+      .from('expenses')
+      .upsert(
+        [
+          {
+            trip_id: selectedTrip.id,
+            user_id: user.id,
+            category: 'BUDGET',
+            title: '개인 환전금',
+            amount: exchangedAmount,
+            expense_date: selectedTrip.start_date || new Date().toISOString().split('T')[0],
+          },
+        ],
+        { onConflict: 'trip_id,user_id,category' }
+      );
+
+    if (!budgetError) {
       setIsBudgetModalOpen(false);
-      const updatedTrip = {
-        ...selectedTrip,
-        exchanged_amount: exchangedAmount,
-        currency_unit: currencyUnit,
-      };
-      setSelectedTrip(updatedTrip);
-      fetchTrips();
+      setSelectedTrip({ ...selectedTrip, currency_unit: currencyUnit });
+      fetchExpenses(selectedTrip.id);
       fetchExchangeRate(currencyUnit);
+    } else {
+      alert(`환전금 저장 실패: ${budgetError.message}`);
     }
   };
 
@@ -212,13 +238,13 @@ export default function ExpensesPage() {
     const { error } = await supabase.from('expenses').insert([
       {
         trip_id: selectedTrip.id,
+        user_id: user.id, // 🌟 내 작성자 ID 등록
         title: expenseTitle,
         category: expenseCategory,
         amount: finalAmount,
         amount_krw: calcKrw,
         payment_method: paymentMethod,
         expense_date: expenseDate,
-        user_id: user.id 
       },
     ]);
 
@@ -263,7 +289,6 @@ export default function ExpensesPage() {
 
   const tripDays = selectedTrip ? getTripDays(selectedTrip.start_date, selectedTrip.end_date) : [];
 
-  // 스와이프 감지 함수: 1단계씩 넘어가며 상단 Day 탭을 동기화
   const handleScroll = () => {
     if (!sliderRef.current || selectedDayFilter === 'all') return;
     const { scrollLeft, clientWidth } = sliderRef.current;
@@ -299,7 +324,7 @@ export default function ExpensesPage() {
     });
   };
 
-  // 선택된 Day 필터에 따른 지출 내역 가공
+  // 선택된 Day 필터에 따른 내 지출 내역 가공
   const filteredExpenses = expenses.filter((item) => {
     if (selectedDayFilter === 'all') return true;
     const targetDayObj = tripDays.find((d) => d.dayNum === selectedDayFilter);
@@ -316,11 +341,11 @@ export default function ExpensesPage() {
     .filter((e) => e.payment_method === '카드')
     .reduce((sum, item) => sum + (item.amount || item.amount_krw || 0), 0);
 
-  const totalExchanged = selectedTrip?.exchanged_amount || 0;
+  // 🌟 내 개인 총 환전금과 현금 지출로 남아있는 잔액 계산
+  const totalExchanged = myBudgetAmount;
   const remainingCash = totalExchanged - totalSpentCash;
   const usagePercent = totalExchanged > 0 ? Math.min(Math.round((totalSpentCash / totalExchanged) * 100), 100) : 0;
 
-  // 🌟 프로젝트 고유 설정 테마 색상 (기본값 블루)
   const themeColor = selectedTrip?.color || '#3b82f6';
 
   return (
@@ -352,7 +377,10 @@ export default function ExpensesPage() {
         {selectedTrip && (
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
-              onClick={() => setIsBudgetModalOpen(true)}
+              onClick={() => {
+                setExchangedAmount(myBudgetAmount);
+                setIsBudgetModalOpen(true);
+              }}
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold px-2 py-1.5 sm:px-3 sm:py-2.5 rounded-xl transition flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <Wallet size={14} className="shrink-0" />
@@ -572,7 +600,6 @@ export default function ExpensesPage() {
                   <h3 className="text-xs sm:text-sm font-bold text-slate-800">지출 세부 항목</h3>
                 </div>
 
-                {/* 🌟 선택된 여행 프로젝트 고유의 테마 색상(themeColor) 연동 */}
                 {tripDays.length > 0 && (
                   <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     <button

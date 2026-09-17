@@ -10,7 +10,9 @@ import {
   X, 
   BookOpen, 
   MapPin, 
-  ExternalLink 
+  ExternalLink,
+  User,
+  Download
 } from 'lucide-react';
 
 interface Trip {
@@ -23,6 +25,8 @@ interface Trip {
 interface GalleryPhoto {
   id: string;
   diary_id: string;
+  user_id: string;
+  author_email: string;
   trip_id: string;
   trip_title: string;
   trip_color: string;
@@ -39,6 +43,7 @@ export default function GalleryPage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string>('all');
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // 라이트박스 모달 상태
@@ -47,17 +52,49 @@ export default function GalleryPage() {
   const fetchGalleryData = async () => {
     setLoading(true);
 
-    // 1. 여행 목록 불러오기
+    // 1. 현재 로그인한 사용자 정보 및 이름 추출
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setCurrentUserId(user.id);
+
+    const myName = user?.user_metadata?.full_name 
+      || user?.user_metadata?.name 
+      || user?.email 
+      || '나';
+
+    // 2. 내가 참여 중인 모든 여행 목록 불러오기
     const { data: tripData } = await supabase
       .from('trips')
-      .select('id, title, destination, color')
+      .select('id, title, destination, color, user_id')
       .order('start_date', { ascending: false });
 
     if (tripData) {
       setTrips(tripData);
     }
 
-    // 2. 다이어리 데이터 불러와서 사진 단위로 언패킹(Unpack)
+    // 3. 🌟 방장 + 동행자 전체 사용자 이름 맵 생성
+    const emailMap: Record<string, string> = {};
+    if (user) {
+      emailMap[user.id] = myName;
+    }
+
+    if (tripData && tripData.length > 0) {
+      for (const trip of tripData) {
+        // RPC 함수로 동행자 및 방장의 실제 이름/이메일 확보
+        const { data: userData } = await supabase.rpc('get_all_trip_users_with_email', {
+          trip_id_input: trip.id
+        });
+
+        if (userData) {
+          userData.forEach((u: any) => {
+            if (u.user_id && u.email) {
+              emailMap[u.user_id] = u.email;
+            }
+          });
+        }
+      }
+    }
+
+    // 4. trip_diaries 전체 다이어리 데이터 조회
     const { data: diaryData, error } = await supabase
       .from('trip_diaries')
       .select('*, trips(id, title, destination, color)')
@@ -72,11 +109,18 @@ export default function GalleryPage() {
           ? diary.photo_urls 
           : (diary.photo_url ? [diary.photo_url] : []);
 
+        // 🌟 작성자 표기: 내 글이면 '나', 그 외엔 추출된 실제 이름/이메일 표기
+        const authorDisplay = diary.user_id === user?.id 
+          ? '나' 
+          : (emailMap[diary.user_id] || `동행자 (${diary.user_id?.substring(0, 6)}...)`);
+
         urls.forEach((url: string) => {
           if (url) {
             photoList.push({
               id: `${diary.id}_${Math.random().toString(36).substring(2, 7)}`,
               diary_id: diary.id,
+              user_id: diary.user_id,
+              author_email: authorDisplay,
               trip_id: diary.trip_id,
               trip_title: tripInfo?.title || '여행 프로젝트',
               trip_color: tripInfo?.color || '#3b82f6',
@@ -101,6 +145,26 @@ export default function GalleryPage() {
     fetchGalleryData();
   }, []);
 
+  // 이미지 원본 다운로드(저장) 함수
+  const handleDownloadImage = async (fileUrl: string, title: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title || 'trip_photo'}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert('사진 저장 중 오류가 발생했습니다.');
+    }
+  };
+
   // 필터링된 사진 목록
   const filteredPhotos = selectedTripId === 'all'
     ? photos
@@ -108,15 +172,15 @@ export default function GalleryPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5 w-full pb-8">
-      {/* 🌟 1. 상단 타이틀 바: 모바일 대응 보정 */}
+      {/* 1. 상단 타이틀 바 */}
       <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-row items-center justify-between gap-2.5">
         <div className="min-w-0">
           <h1 className="text-base sm:text-2xl font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 truncate">
             <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 shrink-0" />
-            <span>추억 포토 갤러리</span>
+            <span>추억 공유 포토 갤러리</span>
           </h1>
           <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-0.5">
-            그동안 소중하게 기록했던 여행 사진들을 피드로 한눈에 감상해 보세요.
+            동행자들과 함께 올린 소중한 여행 사진들을 한눈에 감상하고 소장하세요.
           </p>
         </div>
 
@@ -211,6 +275,9 @@ export default function GalleryPage() {
                 </div>
 
                 <div>
+                  <p className="text-[10px] text-blue-300 font-extrabold flex items-center gap-1 mb-0.5 truncate">
+                    <User size={10} /> {item.author_email}
+                  </p>
                   <p className="text-xs font-bold text-white truncate">{item.diary_title}</p>
                   <p className="text-[10px] text-slate-300 truncate mt-0.5">{item.trip_title}</p>
                 </div>
@@ -241,7 +308,7 @@ export default function GalleryPage() {
               />
             </div>
 
-            {/* 우측: 일기 정보 상세 */}
+            {/* 우측: 상세 정보 */}
             <div className="sm:w-1/2 p-4 sm:p-5 flex flex-col justify-between space-y-3 sm:space-y-4 bg-white overflow-y-auto">
               <div className="space-y-2.5 sm:space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -262,7 +329,12 @@ export default function GalleryPage() {
                   <p className="text-[11px] sm:text-xs font-bold text-slate-400 flex items-center gap-1">
                     <MapPin size={12} /> {selectedPhoto.trip_title} • {selectedPhoto.destination}
                   </p>
-                  <h3 className="text-sm sm:text-lg font-black text-slate-900 mt-0.5">
+                  
+                  <p className="text-xs font-extrabold text-blue-600 flex items-center gap-1 mt-1">
+                    <User size={12} /> 작성자: {selectedPhoto.author_email}
+                  </p>
+
+                  <h3 className="text-sm sm:text-lg font-black text-slate-900 mt-1">
                     {selectedPhoto.diary_title}
                   </h3>
                 </div>
@@ -274,14 +346,23 @@ export default function GalleryPage() {
                 </div>
               </div>
 
-              {/* 하단 일기 페이지 이동 링크 */}
-              <div className="pt-2 border-t border-slate-100">
-                <Link
-                  href="/diaries"
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              {/* 하단 버튼 영역 */}
+              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                <button
+                  onClick={() => handleDownloadImage(selectedPhoto.photo_url, selectedPhoto.diary_title)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <BookOpen size={14} /> 해당 일기 전체 보러가기 <ExternalLink size={12} />
-                </Link>
+                  <Download size={14} /> 사진 저장하기
+                </button>
+
+                {currentUserId && selectedPhoto.user_id === currentUserId && (
+                  <Link
+                    href="/diaries"
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <BookOpen size={14} /> 내 일기 전체 보러가기 <ExternalLink size={12} />
+                  </Link>
+                )}
               </div>
             </div>
           </div>

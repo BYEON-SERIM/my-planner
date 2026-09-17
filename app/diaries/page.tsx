@@ -32,6 +32,7 @@ interface Trip {
 interface TripDiary {
   id: string;
   trip_id: string;
+  user_id?: string;
   day_num: number;
   title: string;
   content: string;
@@ -94,11 +95,16 @@ export default function DiariesPage() {
     setLoading(false);
   };
 
+  // 🌟 내 user_id 데이터만 필터링해서 가져오는 함수
   const fetchDiaries = async (tripId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
     const { data, error } = await supabase
       .from('trip_diaries')
       .select('*')
       .eq('trip_id', tripId)
+      .eq('user_id', user.id) // 🌟 로그인한 나의 user_id 조건만 조회
       .order('day_num', { ascending: true });
 
     if (!error && data) {
@@ -202,7 +208,7 @@ export default function DiariesPage() {
       for (const file of selectedNewFiles) {
         const fileExt = file.name.split('.').pop();
         const fileName = `diary_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const filePath = `${selectedTrip.id}/diaries/${fileName}`;
+        const filePath = `${selectedTrip.id}/${user.id}/diaries/${fileName}`; // 🌟 개인 폴더 구분
 
         const { error: uploadError } = await supabase.storage
           .from('trip-files')
@@ -233,13 +239,15 @@ export default function DiariesPage() {
             photo_url: finalUrls[0] || '',
             photo_path: finalPaths[0] || '',
           })
-          .eq('id', editDiaryId);
+          .eq('id', editDiaryId)
+          .eq('user_id', user.id); // 🌟 본인 글만 수정 가능하도록 조건 부여
 
         if (error) throw error;
       } else {
         const { error } = await supabase.from('trip_diaries').insert([
           {
             trip_id: selectedTrip.id,
+            user_id: user.id, // 🌟 내 작성자 ID 함께 등록
             day_num: activeDayNum,
             title: diaryTitle,
             content: diaryContent,
@@ -248,7 +256,6 @@ export default function DiariesPage() {
             photo_paths: finalPaths,
             photo_url: finalUrls[0] || '',
             photo_path: finalPaths[0] || '',
-            user_id: user.id 
           },
         ]);
 
@@ -297,7 +304,6 @@ export default function DiariesPage() {
     return `${yyyy}.${mm}.${dd} (${dayName})`;
   };
 
-  // 🌟 스와이프 감지 및 상단 버튼 동기화
   const handleScroll = () => {
     if (!sliderRef.current) return;
     const { scrollLeft, clientWidth } = sliderRef.current;
@@ -316,7 +322,6 @@ export default function DiariesPage() {
     }
   };
 
-  // 🌟 음수 좌표 계산 에러 완벽 해결 (dayNum === 0 일 때 스크롤 0px 처리)
   const scrollToDay = (dayNum: number) => {
     setSelectedDayFilter(dayNum);
 
