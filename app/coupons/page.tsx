@@ -16,7 +16,8 @@ import {
   User,
   Clock,
   AlertCircle,
-  Users
+  Users,
+  Search
 } from 'lucide-react';
 
 interface Coupon {
@@ -40,6 +41,12 @@ interface Friend {
   friend_name?: string;
 }
 
+interface SearchedUser {
+  user_id: string;
+  email: string;
+  name: string;
+}
+
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -61,9 +68,10 @@ export default function CouponsPage() {
   const [couponDesc, setCouponDesc] = useState('');
   const [expiresAtInput, setExpiresAtInput] = useState('');
 
-  // 이메일 기반 친구 직접 등록 입력 상태
-  const [newFriendEmail, setNewFriendEmail] = useState('');
-  const [newFriendName, setNewFriendName] = useState('');
+  // 🌟 실시간 친구 검색 관련 상태
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchedUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const presets = [
     '☕ 커피&디저트 쏘기권',
@@ -109,23 +117,41 @@ export default function CouponsPage() {
     fetchFriends();
   }, []);
 
-  // 이메일로 친구 직접 등록 (검색 기능 제거)
-  const handleAddFriendDirect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUserId || !newFriendEmail.trim()) return;
+  // 🌟 실시간 users 테이블 검색 (드롭다운용)
+  const handleSearchUsers = async (query: string) => {
+    setSearchKeyword(query);
+    if (!query.trim() || !currentUserId) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    const { data, error } = await supabase.rpc('search_registered_users', {
+      search_query: query.trim(),
+      current_user_id: currentUserId
+    });
+
+    if (!error && data) setSearchResults(data as SearchedUser[]);
+    setIsSearching(false);
+  };
+
+  // 🌟 검색 드롭다운에서 유저 선택 후 친구 추가
+  const handleSelectAndAddFriend = async (targetUser: SearchedUser) => {
+    if (!currentUserId) return;
 
     const { error } = await supabase.from('friends').insert([
       {
         user_id: currentUserId,
-        friend_email: newFriendEmail.trim().toLowerCase(),
-        friend_name: newFriendName.trim() || newFriendEmail.split('@')[0]
+        friend_id: targetUser.user_id,
+        friend_email: targetUser.email,
+        friend_name: targetUser.name
       }
     ]);
 
     if (!error) {
-      alert(`🎉 '${newFriendName || newFriendEmail}' 님이 친구 목록에 추가되었습니다!`);
-      setNewFriendEmail('');
-      setNewFriendName('');
+      alert(`🎉 '${targetUser.name}(${targetUser.email})' 님이 친구로 등록되었습니다!`);
+      setSearchKeyword('');
+      setSearchResults([]);
       setIsFriendAddOpen(false);
       fetchFriends();
     } else {
@@ -224,7 +250,7 @@ export default function CouponsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5 w-full max-w-5xl mx-auto pb-10 px-2 sm:px-0">
-      {/* 1. 반응형으로 정돈된 상단 헤더 영역 */}
+      {/* 1. 상단 헤더 영역 */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-pink-50 rounded-xl shrink-0">
@@ -252,11 +278,15 @@ export default function CouponsPage() {
           </button>
 
           <button
-            onClick={() => setIsFriendAddOpen(true)}
+            onClick={() => {
+              setSearchKeyword('');
+              setSearchResults([]);
+              setIsFriendAddOpen(true);
+            }}
             className="flex-1 sm:flex-initial bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
           >
             <UserPlus size={15} />
-            <span>친구 추가</span>
+            <span>+ 친구 추가</span>
           </button>
 
           <button
@@ -472,60 +502,83 @@ export default function CouponsPage() {
         </div>
       )}
 
-      {/* 5. 이메일 직접 친구 추가 모달 (검색 기능 제거) */}
+      {/* 5. 🌟 복원된 드롭다운 방식 유저 검색 및 친구 추가 모달 */}
       {isFriendAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-1.5">
-                <UserPlus size={16} className="text-blue-600" /> 새 친구 등록하기
+                <UserPlus size={16} className="text-blue-600" /> 가입된 유저 검색 / 친구 추가
               </h2>
               <button onClick={() => setIsFriendAddOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleAddFriendDirect} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-slate-400 mb-1 block">친구 별명 / 이름 (선택)</label>
+            <div className="space-y-3">
+              {/* 검색어 입력창 */}
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-3 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="예: 홍길동"
-                  value={newFriendName}
-                  onChange={(e) => setNewFriendName(e.target.value)}
-                  className="w-full text-xs font-bold text-slate-900 bg-slate-50 border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
+                  placeholder="이름 또는 이메일 입력..."
+                  value={searchKeyword}
+                  onChange={(e) => handleSearchUsers(e.target.value)}
+                  className="w-full text-xs sm:text-sm font-bold text-slate-900 bg-slate-50 border border-slate-200 pl-9 pr-3 py-2.5 rounded-xl outline-none focus:border-blue-600"
+                  autoFocus
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-400 mb-1 block">친구 이메일 주소</label>
-                <input
-                  type="email"
-                  placeholder="friend@example.com"
-                  value={newFriendEmail}
-                  onChange={(e) => setNewFriendEmail(e.target.value)}
-                  className="w-full text-xs font-bold text-slate-900 bg-slate-50 border border-slate-200 p-2.5 rounded-xl outline-none focus:border-blue-600"
-                  required
-                />
+              {/* 검색 드롭다운 결과 목록 */}
+              <div className="max-h-52 overflow-y-auto space-y-1.5 divide-y divide-slate-100 pr-1">
+                {isSearching ? (
+                  <p className="text-xs text-slate-400 text-center py-4">사용자를 검색 중입니다...</p>
+                ) : searchKeyword.trim() === '' ? (
+                  <p className="text-xs text-slate-400 text-center py-4">이름이나 이메일을 치면 결과가 나타납니다.</p>
+                ) : searchResults.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4">가입된 일치 유저가 없습니다.</p>
+                ) : (
+                  searchResults.map((u) => {
+                    const isAlreadyFriend = friends.some(f => f.friend_email.toLowerCase() === u.email.toLowerCase());
+
+                    return (
+                      <div key={u.user_id} className="pt-2 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-slate-800 truncate flex items-center gap-1">
+                            <User size={12} className="text-blue-600" /> {u.name}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                        </div>
+
+                        {isAlreadyFriend ? (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg shrink-0">
+                            등록됨
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectAndAddFriend(u)}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-xs font-bold px-2.5 py-1 rounded-lg transition cursor-pointer shrink-0"
+                          >
+                            + 친구 추가
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+              <div className="pt-2 flex justify-end border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsFriendAddOpen(false)}
                   className="px-3.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newFriendEmail.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs cursor-pointer transition disabled:opacity-50"
-                >
-                  등록 완료
+                  닫기
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
