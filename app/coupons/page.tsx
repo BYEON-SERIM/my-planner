@@ -159,36 +159,42 @@ export default function CouponsPage() {
   };
 
   // 🌟 쿠폰 발행하기 (유효기간 포함)
-  const handleSendCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!receiverEmailInput.trim() || !couponTitle.trim()) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase.from('coupons').insert([
-      {
-        sender_id: user.id,
-        receiver_email: receiverEmailInput.trim().toLowerCase(),
-        title: couponTitle.trim(),
-        description: couponDesc.trim(),
-        expires_at: expiresAtInput || null,
-        status: 'AVAILABLE'
-      }
-    ]);
-
-    if (!error) {
-      setIsModalOpen(false);
-      setReceiverEmailInput('');
-      setCouponTitle('');
-      setCouponDesc('');
-      setExpiresAtInput('');
-      alert('🎉 약속 쿠폰을 발송했습니다!');
-      fetchCoupons();
-    } else {
-      alert('쿠폰 발행 실패: ' + error.message);
-    }
-  };
+    const handleSendCoupon = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!receiverEmailInput.trim() || !couponTitle.trim()) return;
+    
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        // 🌟 user가 없으면(null이면) 아래 로직을 진행하지 않도록 보완
+        if (!user) {
+        alert('로그인이 필요합니다.');
+        return;
+        }
+    
+        // 이제 TypeScript가 user가 null이 아님을 확신하므로 user.id에 빨간 줄이 생기지 않습니다!
+        const { error } = await supabase.from('coupons').insert([
+        {
+            sender_id: user.id,
+            receiver_email: receiverEmailInput.trim().toLowerCase(),
+            title: couponTitle.trim(),
+            description: couponDesc.trim(),
+            expires_at: expiresAtInput || null,
+            status: 'AVAILABLE'
+        }
+        ]);
+    
+        if (!error) {
+        setIsModalOpen(false);
+        setReceiverEmailInput('');
+        setCouponTitle('');
+        setCouponDesc('');
+        setExpiresAtInput('');
+        alert('🎉 약속 쿠폰을 발송했습니다!');
+        fetchCoupons();
+        } else {
+        alert('쿠폰 발행 실패: ' + error.message);
+        }
+    };
 
   // 사용 완료 도장 찍기
   const handleCompleteUseCoupon = async (couponId: string) => {
