@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import NotificationDropdown from './NotificationDropdown';
 import {
   Sparkles,
   Calendar,
@@ -93,7 +92,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* 🌟 모바일 전용 상단 헤더 (우측에만 종 아이콘 노출) */}
+      {/* 모바일/패드 전용 상단 헤더 */}
       <div className="lg:hidden flex items-center justify-between p-3.5 bg-white border-b border-slate-100 fixed top-0 left-0 right-0 z-40">
         <div className="flex items-center gap-2">
           <button
@@ -111,11 +110,6 @@ export default function Sidebar() {
           >
             SECO LOG
           </Link>
-        </div>
-
-        {/* 모바일 우측 알림 종 버튼 */}
-        <div className="flex items-center gap-1">
-          <NotificationDropdown />
         </div>
       </div>
 
@@ -138,39 +132,30 @@ export default function Sidebar() {
       >
         <div className="space-y-6">
           {/* 상단 로고 & 토글 버튼 */}
-          <div className="flex items-center justify-between px-1 py-1 mb-2">
+          <div className="flex items-center justify-between px-1 py-1">
             <Link
               href="/"
               onClick={() => setIsOpen(false)}
               className="flex items-center gap-2.5 overflow-hidden group cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+              <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200/60 flex items-center justify-center text-blue-600 shrink-0">
                 <Sparkles size={18} />
               </div>
               {!isCollapsed && (
-                <span className="font-black text-lg text-slate-900 tracking-tight whitespace-nowrap">
+                <span className="font-black text-lg text-slate-800 tracking-tight whitespace-nowrap">
                   SECO LOG
                 </span>
               )}
             </Link>
 
-            {/* 우측 아이콘 버튼 그룹 (종 아이콘 + 접기 버튼) */}
-            <div className="flex items-center gap-0.5">
-              {!isCollapsed && (
-                <div className="hidden lg:flex items-center justify-center">
-                  <NotificationDropdown />
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="hidden lg:flex p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              >
-                {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="hidden lg:flex p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+              title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            >
+              {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+            </button>
           </div>
 
           {/* 메뉴 리스트 */}
@@ -220,7 +205,7 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        {/* 하단 프로필 영역 */}
+        {/* 하단 로그인/프로필 영역 */}
         <div className="pt-3 border-t border-slate-100">
           {loading ? (
             <div className="py-2 text-center text-[10px] text-slate-400">확인 중...</div>
