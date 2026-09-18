@@ -62,7 +62,7 @@ export default function CouponsPage() {
   const [couponTitle, setCouponTitle] = useState('');
   const [couponDesc, setCouponDesc] = useState('');
   
-  // 🌟 실시간 친구 검색 관련 상태
+  // 실시간 친구 검색 관련 상태
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<SearchedUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -117,7 +117,7 @@ export default function CouponsPage() {
     fetchFriends();
   }, []);
 
-  // 🌟 등록 유저 실시간 검색 함수
+  // 등록 유저 실시간 검색 함수
   const handleSearchUsers = async (query: string) => {
     setSearchKeyword(query);
     if (!query.trim() || !currentUserId) {
@@ -137,7 +137,7 @@ export default function CouponsPage() {
     setIsSearching(false);
   };
 
-  // 🌟 검색 결과에서 클릭하여 친구 등록하기
+  // 친구 등록
   const handleSelectAndAddFriend = async (targetUser: SearchedUser) => {
     if (!currentUserId) return;
 
@@ -218,6 +218,12 @@ export default function CouponsPage() {
 
     const { error } = await supabase.from('coupons').delete().eq('id', couponId);
     if (!error) fetchCoupons();
+  };
+
+  // 🌟 이메일로 친구 이름 찾기 helper 함수
+  const getFriendNameByEmail = (email: string) => {
+    const friend = friends.find(f => f.friend_email.toLowerCase() === email.toLowerCase());
+    return friend?.friend_name || email;
   };
 
   const receivedCoupons = coupons.filter(c => c.receiver_email.toLowerCase() === currentUserEmail?.toLowerCase());
@@ -304,6 +310,10 @@ export default function CouponsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {displayCoupons.map((item) => {
             const isUsed = item.status === 'USED';
+            // 🌟 이름 우선 표시 처리
+            const displayTargetName = activeTab === 'received' 
+              ? '보낸 분' 
+              : getFriendNameByEmail(item.receiver_email);
 
             return (
               <div
@@ -322,8 +332,9 @@ export default function CouponsPage() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white border border-pink-100 text-pink-600 shadow-2xs flex items-center gap-1 truncate max-w-[180px]">
-                      <Mail size={11} /> {activeTab === 'received' ? '받음' : `To. ${item.receiver_email}`}
+                    {/* 🌟 To. 이메일 -> To. 친구이름 으로 변경 */}
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-white border border-pink-100 text-pink-600 shadow-2xs flex items-center gap-1 truncate max-w-[180px]">
+                      <User size={11} /> {activeTab === 'received' ? '받음' : `To. ${displayTargetName}`}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium shrink-0">
                       {new Date(item.created_at).toLocaleDateString()}
@@ -383,7 +394,7 @@ export default function CouponsPage() {
         </div>
       )}
 
-      {/* 4. 🌟 실시간 이름/이메일 검색 기반 친구 추가 모달 */}
+      {/* 4. 친구 추가 모달 */}
       {isFriendAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-5 space-y-4">
@@ -397,7 +408,6 @@ export default function CouponsPage() {
             </div>
 
             <div className="space-y-3">
-              {/* 검색창 */}
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-3 text-slate-400" />
                 <input
@@ -410,7 +420,6 @@ export default function CouponsPage() {
                 />
               </div>
 
-              {/* 검색 결과 리스트 */}
               <div className="max-h-52 overflow-y-auto space-y-1.5 divide-y divide-slate-100 pr-1">
                 {isSearching ? (
                   <p className="text-xs text-slate-400 text-center py-4">사용자를 검색 중입니다...</p>
