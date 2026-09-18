@@ -286,7 +286,7 @@ export default function CouponsPage() {
             className="flex-1 sm:flex-initial bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
           >
             <UserPlus size={15} />
-            <span>+ 친구 추가</span>
+            <span>친구 추가</span>
           </button>
 
           <button
