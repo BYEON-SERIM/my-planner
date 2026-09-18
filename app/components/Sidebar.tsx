@@ -21,7 +21,8 @@ import {
   LayoutDashboard,
   Image as ImageIcon,
   LogOut,
-  LogIn
+  LogIn,
+  Heart
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -74,6 +75,7 @@ export default function Sidebar() {
         { name: '캘린더', path: '/calendar', icon: Calendar },
         { name: 'To Do LIST', path: '/todo', icon: CheckSquare },
         { name: '월간 가계부', path: '/account-book', icon: Wallet },
+        { name: '약속 쿠폰함', path: '/coupons', icon: Heart },
       ],
     },
     {
@@ -184,8 +186,17 @@ export default function Sidebar() {
                       } ${isCollapsed ? 'justify-center px-0' : ''}`}
                       title={isCollapsed ? item.name : undefined}
                     >
-                      <Icon size={18} className={`shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                      {!isCollapsed && <span className="truncate text-xs">{item.name}</span>}
+                      <Icon 
+                        size={18} 
+                        className={`shrink-0 ${
+                          isActive 
+                            ? 'text-blue-600' 
+                            : 'text-slate-400'
+                        }`} 
+                      />
+                      {!isCollapsed && (
+                        <span className="truncate text-xs">{item.name}</span>
+                      )}
                     </Link>
                   );
                 })}
@@ -194,13 +205,12 @@ export default function Sidebar() {
           </nav>
         </div>
 
-        {/* 🌟 한 줄 구성 하단 로그인/프로필 영역 */}
+        {/* 하단 로그인/프로필 영역 */}
         <div className="pt-3 border-t border-slate-100">
           {loading ? (
             <div className="py-2 text-center text-[10px] text-slate-400">확인 중...</div>
           ) : user ? (
             <div className={`flex items-center justify-between gap-2 px-1 ${isCollapsed ? 'flex-col justify-center' : ''}`}>
-              {/* 프로필 이미지 & 유저 정보 */}
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {user.user_metadata?.avatar_url ? (
                   <img
@@ -223,7 +233,6 @@ export default function Sidebar() {
                 )}
               </div>
 
-              {/* 로그아웃 버튼 */}
               <button
                 type="button"
                 onClick={handleLogout}
