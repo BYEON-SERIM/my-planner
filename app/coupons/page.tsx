@@ -14,9 +14,10 @@ import {
   Mail,
   Check,
   UserPlus,
-  Users,
   Search,
-  User
+  User,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 interface Coupon {
@@ -28,6 +29,9 @@ interface Coupon {
   status: 'AVAILABLE' | 'USED';
   created_at: string;
   used_at?: string;
+  expires_at?: string;
+  sender_email?: string;
+  sender_name?: string;
 }
 
 interface Friend {
@@ -50,7 +54,7 @@ export default function CouponsPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 탭 상태 ('received' = 받은 쿠폰, 'sent' = 발행한 쿠폰)
+  // 탭 상태
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
 
   // 모달 상태
@@ -61,13 +65,13 @@ export default function CouponsPage() {
   const [receiverEmailInput, setReceiverEmailInput] = useState('');
   const [couponTitle, setCouponTitle] = useState('');
   const [couponDesc, setCouponDesc] = useState('');
+  const [expiresAtInput, setExpiresAtInput] = useState('');
   
   // 실시간 친구 검색 관련 상태
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<SearchedUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // 인기 쿠폰 추천 프리셋
   const presets = [
     '☕ 커피&디저트 쏘기권',
     '🚗 하루 전담 기사권',
@@ -77,7 +81,7 @@ export default function CouponsPage() {
     '🤫 무조건 봐주기 1회권'
   ];
 
-  // 내 친구 목록 조회
+  // 친구 목록 조회
   const fetchFriends = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -87,12 +91,10 @@ export default function CouponsPage() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setFriends(data as Friend[]);
-    }
+    if (!error && data) setFriends(data as Friend[]);
   };
 
-  // 쿠폰 목록 조회
+  // 🌟 RPC로 보낸 사람 이름이 포함된 쿠폰 목록 조회
   const fetchCoupons = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -100,10 +102,7 @@ export default function CouponsPage() {
       setCurrentUserId(user.id);
       setCurrentUserEmail(user.email || null);
 
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.rpc('get_coupons_with_sender');
 
       if (!error && data) {
         setCoupons(data as Coupon[]);
@@ -117,7 +116,7 @@ export default function CouponsPage() {
     fetchFriends();
   }, []);
 
-  // 등록 유저 실시간 검색 함수
+  // 실시간 유저 검색
   const handleSearchUsers = async (query: string) => {
     setSearchKeyword(query);
     if (!query.trim() || !currentUserId) {
@@ -131,13 +130,11 @@ export default function CouponsPage() {
       current_user_id: currentUserId
     });
 
-    if (!error && data) {
-      setSearchResults(data as SearchedUser[]);
-    }
+    if (!error && data) setSearchResults(data as SearchedUser[]);
     setIsSearching(false);
   };
 
-  // 친구 등록
+  // 친구 추가
   const handleSelectAndAddFriend = async (targetUser: SearchedUser) => {
     if (!currentUserId) return;
 
@@ -157,15 +154,11 @@ export default function CouponsPage() {
       setIsFriendAddOpen(false);
       fetchFriends();
     } else {
-      if (error.code === '23505') {
-        alert('이미 친구로 등록된 사용자입니다.');
-      } else {
-        alert('친구 등록 실패: ' + error.message);
-      }
+      alert('친구 등록 실패: ' + error.message);
     }
   };
 
-  // 쿠폰 발행하기
+  // 🌟 쿠폰 발행하기 (유효기간 포함)
   const handleSendCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!receiverEmailInput.trim() || !couponTitle.trim()) return;
@@ -179,6 +172,7 @@ export default function CouponsPage() {
         receiver_email: receiverEmailInput.trim().toLowerCase(),
         title: couponTitle.trim(),
         description: couponDesc.trim(),
+        expires_at: expiresAtInput || null,
         status: 'AVAILABLE'
       }
     ]);
@@ -188,6 +182,7 @@ export default function CouponsPage() {
       setReceiverEmailInput('');
       setCouponTitle('');
       setCouponDesc('');
+      setExpiresAtInput('');
       alert('🎉 약속 쿠폰을 발송했습니다!');
       fetchCoupons();
     } else {
@@ -195,7 +190,7 @@ export default function CouponsPage() {
     }
   };
 
-  // 발행자가 [사용 완료 도장 찍기]
+  // 사용 완료 도장 찍기
   const handleCompleteUseCoupon = async (couponId: string) => {
     if (!confirm('이 쿠폰을 사용 완료 상태로 변경하시겠습니까?')) return;
 
@@ -207,23 +202,27 @@ export default function CouponsPage() {
       })
       .eq('id', couponId);
 
-    if (!error) {
-      fetchCoupons();
-    }
+    if (!error) fetchCoupons();
   };
 
-  // 발행자가 쿠폰 삭제
+  // 쿠폰 삭제
   const handleDeleteCoupon = async (couponId: string) => {
     if (!confirm('발행했던 쿠폰을 취소/삭제하시겠습니까?')) return;
-
     const { error } = await supabase.from('coupons').delete().eq('id', couponId);
     if (!error) fetchCoupons();
   };
 
-  // 🌟 이메일로 친구 이름 찾기 helper 함수
+  // 이메일 기반 친구 이름 찾기 helper
   const getFriendNameByEmail = (email: string) => {
     const friend = friends.find(f => f.friend_email.toLowerCase() === email.toLowerCase());
     return friend?.friend_name || email;
+  };
+
+  // 🌟 만료 여부 확인 함수
+  const checkIsExpired = (expiresAt?: string) => {
+    if (!expiresAt) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return expiresAt < today;
   };
 
   const receivedCoupons = coupons.filter(c => c.receiver_email.toLowerCase() === currentUserEmail?.toLowerCase());
@@ -240,7 +239,7 @@ export default function CouponsPage() {
             <span>약속 & 소원 쿠폰함</span>
           </h1>
           <p className="hidden sm:block text-xs sm:text-sm text-slate-500 mt-1">
-            등록해둔 친구 및 연인에게 한 클릭으로 간편하게 약속 쿠폰을 전달해 보세요!
+            친구나 연인에게 소원 쿠폰을 주고받고 유효기간을 관리해 보세요!
           </p>
         </div>
 
@@ -287,7 +286,7 @@ export default function CouponsPage() {
         </button>
       </div>
 
-      {/* 3. 쿠폰 그리드 피드 */}
+      {/* 3. 쿠폰 피드 리스트 */}
       {loading ? (
         <div className="py-20 text-center space-y-2">
           <Sparkles className="w-6 h-6 text-pink-400 mx-auto animate-pulse" />
@@ -310,31 +309,39 @@ export default function CouponsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {displayCoupons.map((item) => {
             const isUsed = item.status === 'USED';
-            // 🌟 이름 우선 표시 처리
+            const isExpired = !isUsed && checkIsExpired(item.expires_at);
+
+            // 🌟 받은 사람 / 보낸 사람 표시 이름 분기
+            const displaySenderName = item.sender_name || item.sender_email || '보낸 사람';
             const displayTargetName = activeTab === 'received' 
-              ? '보낸 분' 
-              : getFriendNameByEmail(item.receiver_email);
+              ? `From. ${displaySenderName}` 
+              : `To. ${getFriendNameByEmail(item.receiver_email)}`;
 
             return (
               <div
                 key={item.id}
                 className={`p-4 sm:p-5 rounded-2xl border relative overflow-hidden transition flex flex-col justify-between space-y-3.5 ${
-                  isUsed 
+                  isUsed || isExpired
                     ? 'bg-slate-50/80 border-slate-200 opacity-60' 
                     : 'bg-gradient-to-br from-pink-50/50 via-white to-amber-50/30 border-pink-200/80 shadow-2xs hover:border-pink-300'
                 }`}
               >
-                {isUsed && (
+                {/* 도장 연출 (사용 완료 / 기간 만료) */}
+                {isUsed ? (
                   <div className="absolute top-3 right-3 border-2 border-red-500/80 text-red-500 font-black text-xs px-2.5 py-1 rounded-xl rotate-12 bg-white/95 shadow-xs">
                     USED 사용 완료
                   </div>
-                )}
+                ) : isExpired ? (
+                  <div className="absolute top-3 right-3 border-2 border-slate-400 text-slate-500 font-black text-xs px-2.5 py-1 rounded-xl rotate-12 bg-white/95 shadow-xs">
+                    EXPIRED 만료됨
+                  </div>
+                ) : null}
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-1">
-                    {/* 🌟 To. 이메일 -> To. 친구이름 으로 변경 */}
+                    {/* 🌟 From. 보낸사람 / To. 받는사람 정확히 표기 */}
                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-white border border-pink-100 text-pink-600 shadow-2xs flex items-center gap-1 truncate max-w-[180px]">
-                      <User size={11} /> {activeTab === 'received' ? '받음' : `To. ${displayTargetName}`}
+                      <User size={11} /> {displayTargetName}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium shrink-0">
                       {new Date(item.created_at).toLocaleDateString()}
@@ -350,6 +357,13 @@ export default function CouponsPage() {
                       💬 {item.description}
                     </p>
                   )}
+
+                  {/* 🌟 유효기간 표시 바 */}
+                  {item.expires_at && (
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-100/80">
+                      <Clock size={12} /> 유효기간: {item.expires_at}까지 {isExpired && '(기간 만료)'}
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
@@ -358,6 +372,15 @@ export default function CouponsPage() {
                       <div className="flex items-center justify-between w-full text-xs text-slate-400">
                         <span className="flex items-center gap-1 font-bold">
                           <CheckCircle2 size={14} className="text-emerald-500" /> {new Date(item.used_at || '').toLocaleDateString()} 사용됨
+                        </span>
+                        <button onClick={() => handleDeleteCoupon(item.id)} className="text-slate-300 hover:text-red-500 p-1 cursor-pointer" title="삭제">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ) : isExpired ? (
+                      <div className="flex items-center justify-between w-full text-xs text-slate-400">
+                        <span className="flex items-center gap-1 font-bold">
+                          <AlertCircle size={14} className="text-slate-400" /> 유효기간이 지났습니다.
                         </span>
                         <button onClick={() => handleDeleteCoupon(item.id)} className="text-slate-300 hover:text-red-500 p-1 cursor-pointer" title="삭제">
                           <Trash2 size={14} />
@@ -380,6 +403,10 @@ export default function CouponsPage() {
                     isUsed ? (
                       <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
                         <CheckCircle2 size={14} className="text-emerald-500" /> 사용이 완료된 쿠폰입니다.
+                      </span>
+                    ) : isExpired ? (
+                      <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                        <AlertCircle size={14} /> 기간이 만료되어 사용할 수 없습니다.
                       </span>
                     ) : (
                       <span className="text-xs font-extrabold text-pink-600 flex items-center gap-1">
@@ -432,10 +459,7 @@ export default function CouponsPage() {
                     const isAlreadyFriend = friends.some(f => f.friend_email.toLowerCase() === u.email.toLowerCase());
 
                     return (
-                      <div
-                        key={u.user_id}
-                        className="pt-2 flex items-center justify-between gap-2"
-                      >
+                      <div key={u.user_id} className="pt-2 flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-slate-800 truncate flex items-center gap-1">
                             <User size={12} className="text-blue-600" /> {u.name}
@@ -476,7 +500,7 @@ export default function CouponsPage() {
         </div>
       )}
 
-      {/* 5. 쿠폰 발행 모달 */}
+      {/* 5. 🌟 쿠폰 발행 모달 (유효기간 입력 추가) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md p-5 sm:p-6 space-y-4">
@@ -572,6 +596,17 @@ export default function CouponsPage() {
                   value={couponDesc}
                   onChange={(e) => setCouponDesc(e.target.value)}
                   className="w-full text-xs sm:text-sm font-medium text-slate-900 bg-white border border-slate-200 p-2.5 rounded-xl outline-none focus:border-pink-500"
+                />
+              </div>
+
+              {/* 🌟 유효기간 날짜 선택 추가 */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 mb-1 block">유효기간 만료일 (선택)</label>
+                <input
+                  type="date"
+                  value={expiresAtInput}
+                  onChange={(e) => setExpiresAtInput(e.target.value)}
+                  className="w-full text-xs sm:text-sm font-medium text-slate-800 bg-slate-50 border border-slate-200 p-2.5 rounded-xl outline-none focus:border-pink-500"
                 />
               </div>
 
