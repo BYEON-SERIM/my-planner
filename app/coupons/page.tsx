@@ -364,7 +364,7 @@ export default function CouponsPage() {
                   </div>
                 ) : isExpired ? (
                   <div className="absolute top-3 right-3 border-2 border-slate-400 text-slate-500 font-black text-[10px] px-2 py-0.5 rounded-lg rotate-12 bg-white/95">
-                    EXPIRED 만료됨
+                    기간 만료
                   </div>
                 ) : null}
 
